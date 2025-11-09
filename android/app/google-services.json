@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "292881892467",
+    "project_id": "volt-findev",
+    "storage_bucket": "volt-findev.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:292881892467:android:6e71b8f536f77bfa23d606",
+        "android_client_info": {
+          "package_name": "com.example.volt_find"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBJNIzHna74nq2spa2pq2tAFlhwohxEC9I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
