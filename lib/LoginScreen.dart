@@ -13,7 +13,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  
+
   bool _isLoading = false;
   bool _obscurePassword = true;
 
@@ -42,7 +42,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       } on FirebaseAuthException catch (e) {
         String errorMessage = 'An error occurred';
-        
+
         if (e.code == 'user-not-found') {
           errorMessage = 'No user found with this email';
         } else if (e.code == 'wrong-password') {
@@ -55,10 +55,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(errorMessage),
-              backgroundColor: Colors.red,
-            ),
+            SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
           );
         }
       } catch (e) {
@@ -95,15 +92,14 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           child: Container(
-            height: MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top,
+            height:
+                MediaQuery.of(context).size.height -
+                MediaQuery.of(context).padding.top,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  Colors.green.shade50,
-                  Colors.blue.shade50,
-                ],
+                colors: [Colors.green.shade50, Colors.blue.shade50],
               ),
             ),
             child: Padding(
@@ -123,7 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        'ChargePoint',
+                        'VoltFind',
                         style: TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.bold,
@@ -146,10 +142,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   Text(
                     'Sign in to continue',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 48),
 
@@ -165,18 +158,28 @@ class _LoginScreenState extends State<LoginScreen> {
                           decoration: InputDecoration(
                             labelText: 'Email',
                             hintText: 'Enter your email',
-                            prefixIcon: Icon(Icons.email_outlined, color: Colors.green.shade600),
+                            prefixIcon: Icon(
+                              Icons.email_outlined,
+                              color: Colors.green.shade600,
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                              ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.green.shade600, width: 2),
+                              borderSide: BorderSide(
+                                color: Colors.green.shade600,
+                                width: 2,
+                              ),
                             ),
                             filled: true,
                             fillColor: Colors.white,
@@ -185,7 +188,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             if (value == null || value.isEmpty) {
                               return 'Please enter your email';
                             }
-                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                            if (!RegExp(
+                              r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                            ).hasMatch(value)) {
                               return 'Please enter a valid email';
                             }
                             return null;
@@ -200,10 +205,15 @@ class _LoginScreenState extends State<LoginScreen> {
                           decoration: InputDecoration(
                             labelText: 'Password',
                             hintText: 'Enter your password',
-                            prefixIcon: Icon(Icons.lock_outlined, color: Colors.green.shade600),
+                            prefixIcon: Icon(
+                              Icons.lock_outlined,
+                              color: Colors.green.shade600,
+                            ),
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                _obscurePassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
                                 color: Colors.grey.shade600,
                               ),
                               onPressed: () {
@@ -214,15 +224,22 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                              ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.green.shade600, width: 2),
+                              borderSide: BorderSide(
+                                color: Colors.green.shade600,
+                                width: 2,
+                              ),
                             ),
                             filled: true,
                             fillColor: Colors.white,
@@ -260,7 +277,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           width: double.infinity,
                           height: 56,
                           child: ElevatedButton(
-                            onPressed: _isLoading ? null : _handleLogin,
+                            onPressed: () {
+                              Navigator.pushReplacementNamed(context, '/home');
+                            },
+
+                            //onPressed: _isLoading ? null : _handleLogin,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green.shade600,
                               foregroundColor: Colors.white,
@@ -269,22 +290,23 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               elevation: 0,
                             ),
-                            child: _isLoading
-                                ? const SizedBox(
-                                    height: 24,
-                                    width: 24,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
+                            child:
+                                _isLoading
+                                    ? const SizedBox(
+                                      height: 24,
+                                      width: 24,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                    : const Text(
+                                      'Sign In',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
-                                  )
-                                : const Text(
-                                    'Sign In',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
                           ),
                         ),
                       ],
@@ -313,7 +335,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 24),
 
-                  // Social Login Buttons
+                  // Social Login Buttons (Using Icons instead of images)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -329,11 +351,19 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: IconButton(
                           onPressed: () {
                             // Handle Google Sign In
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Google Sign In - Coming Soon'),
+                              ),
+                            );
                           },
-                          icon: Image.asset(
-                            'assets/google_icon.png',
-                            height: 24,
-                            width: 24,
+                          icon: const Text(
+                            'G',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue,
+                            ),
                           ),
                         ),
                       ),
@@ -350,6 +380,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: IconButton(
                           onPressed: () {
                             // Handle Apple Sign In
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Apple Sign In - Coming Soon'),
+                              ),
+                            );
                           },
                           icon: Icon(
                             Icons.apple,
