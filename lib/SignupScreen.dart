@@ -18,7 +18,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _confirmPasswordController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -52,13 +52,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
       try {
         // Create user with email and password
-        UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-        );
+        UserCredential userCredential = await _auth
+            .createUserWithEmailAndPassword(
+              email: _emailController.text.trim(),
+              password: _passwordController.text.trim(),
+            );
 
         // Update display name
-        await userCredential.user?.updateDisplayName(_nameController.text.trim());
+        await userCredential.user?.updateDisplayName(
+          _nameController.text.trim(),
+        );
 
         // Store additional user data in Firestore
         await _firestore.collection('users').doc(userCredential.user?.uid).set({
@@ -75,7 +78,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         }
       } on FirebaseAuthException catch (e) {
         String errorMessage = 'An error occurred';
-        
+
         if (e.code == 'weak-password') {
           errorMessage = 'The password provided is too weak';
         } else if (e.code == 'email-already-in-use') {
@@ -88,10 +91,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(errorMessage),
-              backgroundColor: Colors.red,
-            ),
+            SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
           );
         }
       } catch (e) {
@@ -127,10 +127,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  Colors.green.shade50,
-                  Colors.blue.shade50,
-                ],
+                colors: [Colors.green.shade50, Colors.blue.shade50],
               ),
             ),
             child: Padding(
@@ -139,7 +136,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: 20),
-                  
+
                   // Logo and Title
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -151,7 +148,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        'ChargePoint',
+                        'VoltFind',
                         style: TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.bold,
@@ -174,10 +171,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   Text(
                     'Sign up to get started',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 32),
 
@@ -194,18 +188,28 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           decoration: InputDecoration(
                             labelText: 'Full Name',
                             hintText: 'Enter your full name',
-                            prefixIcon: Icon(Icons.person_outline, color: Colors.green.shade600),
+                            prefixIcon: Icon(
+                              Icons.person_outline,
+                              color: Colors.green.shade600,
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                              ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.green.shade600, width: 2),
+                              borderSide: BorderSide(
+                                color: Colors.green.shade600,
+                                width: 2,
+                              ),
                             ),
                             filled: true,
                             fillColor: Colors.white,
@@ -229,18 +233,28 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           decoration: InputDecoration(
                             labelText: 'Email',
                             hintText: 'Enter your email',
-                            prefixIcon: Icon(Icons.email_outlined, color: Colors.green.shade600),
+                            prefixIcon: Icon(
+                              Icons.email_outlined,
+                              color: Colors.green.shade600,
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                              ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.green.shade600, width: 2),
+                              borderSide: BorderSide(
+                                color: Colors.green.shade600,
+                                width: 2,
+                              ),
                             ),
                             filled: true,
                             fillColor: Colors.white,
@@ -249,7 +263,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             if (value == null || value.isEmpty) {
                               return 'Please enter your email';
                             }
-                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                            if (!RegExp(
+                              r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                            ).hasMatch(value)) {
                               return 'Please enter a valid email';
                             }
                             return null;
@@ -264,18 +280,28 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           decoration: InputDecoration(
                             labelText: 'Phone Number',
                             hintText: 'Enter your phone number',
-                            prefixIcon: Icon(Icons.phone_outlined, color: Colors.green.shade600),
+                            prefixIcon: Icon(
+                              Icons.phone_outlined,
+                              color: Colors.green.shade600,
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                              ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.green.shade600, width: 2),
+                              borderSide: BorderSide(
+                                color: Colors.green.shade600,
+                                width: 2,
+                              ),
                             ),
                             filled: true,
                             fillColor: Colors.white,
@@ -299,10 +325,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           decoration: InputDecoration(
                             labelText: 'Password',
                             hintText: 'Enter your password',
-                            prefixIcon: Icon(Icons.lock_outlined, color: Colors.green.shade600),
+                            prefixIcon: Icon(
+                              Icons.lock_outlined,
+                              color: Colors.green.shade600,
+                            ),
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                _obscurePassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
                                 color: Colors.grey.shade600,
                               ),
                               onPressed: () {
@@ -313,15 +344,22 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                              ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.green.shade600, width: 2),
+                              borderSide: BorderSide(
+                                color: Colors.green.shade600,
+                                width: 2,
+                              ),
                             ),
                             filled: true,
                             fillColor: Colors.white,
@@ -345,29 +383,42 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           decoration: InputDecoration(
                             labelText: 'Confirm Password',
                             hintText: 'Re-enter your password',
-                            prefixIcon: Icon(Icons.lock_outlined, color: Colors.green.shade600),
+                            prefixIcon: Icon(
+                              Icons.lock_outlined,
+                              color: Colors.green.shade600,
+                            ),
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                _obscureConfirmPassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
                                 color: Colors.grey.shade600,
                               ),
                               onPressed: () {
                                 setState(() {
-                                  _obscureConfirmPassword = !_obscureConfirmPassword;
+                                  _obscureConfirmPassword =
+                                      !_obscureConfirmPassword;
                                 });
                               },
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                              ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.green.shade600, width: 2),
+                              borderSide: BorderSide(
+                                color: Colors.green.shade600,
+                                width: 2,
+                              ),
                             ),
                             filled: true,
                             fillColor: Colors.white,
@@ -440,6 +491,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           width: double.infinity,
                           height: 56,
                           child: ElevatedButton(
+                            // onPressed: () {
+                            //   Navigator.pushReplacementNamed(context, '/home');
+                            // },
                             onPressed: _isLoading ? null : _handleSignUp,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green.shade600,
@@ -449,22 +503,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               ),
                               elevation: 0,
                             ),
-                            child: _isLoading
-                                ? const SizedBox(
-                                    height: 24,
-                                    width: 24,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
+                            child:
+                                _isLoading
+                                    ? const SizedBox(
+                                      height: 24,
+                                      width: 24,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                    : const Text(
+                                      'Sign Up',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
-                                  )
-                                : const Text(
-                                    'Sign Up',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
                           ),
                         ),
                       ],
@@ -493,7 +548,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
                   const SizedBox(height: 24),
 
-                  // Social Sign Up Buttons
+                  // Social Sign Up Buttons (Using Icons/Text instead of images)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -509,11 +564,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         child: IconButton(
                           onPressed: () {
                             // Handle Google Sign Up
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Google Sign Up - Coming Soon'),
+                              ),
+                            );
                           },
-                          icon: Image.asset(
-                            'assets/google_icon.png',
-                            height: 24,
-                            width: 24,
+                          icon: const Text(
+                            'G',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue,
+                            ),
                           ),
                         ),
                       ),
@@ -530,6 +593,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         child: IconButton(
                           onPressed: () {
                             // Handle Apple Sign Up
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Apple Sign Up - Coming Soon'),
+                              ),
+                            );
                           },
                           icon: Icon(
                             Icons.apple,

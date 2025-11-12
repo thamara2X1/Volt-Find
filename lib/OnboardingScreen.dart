@@ -16,19 +16,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       icon: Icons.electric_bolt,
       iconColor: Colors.green,
       title: 'Find EV Charging Stations',
-      description: 'Locate nearby charging stations with real-time availability and accurate information',
+      description:
+          'Locate nearby charging stations with real-time availability and accurate information',
     ),
     OnboardingContent(
       icon: Icons.map,
       iconColor: Colors.blue,
       title: 'Navigate with Ease',
-      description: 'Get turn-by-turn directions to your chosen charging station instantly',
+      description:
+          'Get turn-by-turn directions to your chosen charging station instantly',
     ),
     OnboardingContent(
       icon: Icons.access_time,
       iconColor: Colors.purple,
       title: 'Real-Time Updates',
-      description: 'Check station availability, pricing, and connector types in real-time',
+      description:
+          'Check station availability, pricing, and connector types in real-time',
     ),
     OnboardingContent(
       icon: Icons.security,
@@ -68,13 +71,60 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _navigateToSignUp() {
-    // Navigate to Sign Up screen
-    Navigator.pushReplacementNamed(context, '/signup');
+    print('Get Started button pressed'); // Debug log
+    try {
+      Navigator.pushReplacementNamed(context, '/signup')
+          .then((_) {
+            print('Navigated to signup successfully');
+          })
+          .catchError((error) {
+            print('Navigation error: $error');
+            _showErrorDialog(
+              'Navigation Error',
+              'Could not navigate to Sign Up screen: $error',
+            );
+          });
+    } catch (e) {
+      print('Exception during navigation: $e');
+      _showErrorDialog('Error', 'An error occurred: $e');
+    }
   }
 
   void _navigateToLogin() {
-    // Navigate to Login screen
-    Navigator.pushReplacementNamed(context, '/login');
+    print('Sign In button pressed'); // Debug log
+    try {
+      Navigator.pushReplacementNamed(context, '/login')
+          .then((_) {
+            print('Navigated to login successfully');
+          })
+          .catchError((error) {
+            print('Navigation error: $error');
+            _showErrorDialog(
+              'Navigation Error',
+              'Could not navigate to Login screen: $error',
+            );
+          });
+    } catch (e) {
+      print('Exception during navigation: $e');
+      _showErrorDialog('Error', 'An error occurred: $e');
+    }
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text(title),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+    );
   }
 
   @override
@@ -86,10 +136,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Colors.green.shade50,
-                Colors.blue.shade50,
-              ],
+              colors: [Colors.green.shade50, Colors.blue.shade50],
             ),
           ),
           child: Column(
@@ -107,7 +154,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'ChargePoint',
+                      'VoltFind',
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
@@ -173,9 +220,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     height: 8,
                     width: _currentPage == index ? 32 : 8,
                     decoration: BoxDecoration(
-                      color: _currentPage == index
-                          ? Colors.green.shade600
-                          : Colors.grey.shade300,
+                      color:
+                          _currentPage == index
+                              ? Colors.green.shade600
+                              : Colors.grey.shade300,
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
