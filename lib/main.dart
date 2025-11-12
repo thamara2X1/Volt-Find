@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:volt_find/HomeScreen.dart';
 import 'package:volt_find/OnboardingScreen.dart';
 import 'package:volt_find/LoginScreen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:volt_find/SignupScreen.dart';
 import 'firebase_options.dart';
 
-Future<void> main() async {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-await Firebase.initializeApp(
-  options: DefaultFirebaseOptions.currentPlatform,
-);
-runApp(const MyApp());
+  
+  // Initialize Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -23,18 +27,22 @@ class MyApp extends StatelessWidget {
       title: 'Flutter Demo',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      initialRoute: '/',
+      initialRoute: '/onboarding',
       routes: {
-        '/': (context) => const OnboardingScreen(),
+        '/onboarding': (context) => const OnboardingScreen(),
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignUpScreen(),
+        '/home': (context) => const HomeScreen(),
       },
-      
 
+      // Handle undefined routes
+      onUnknownRoute: (settings) {
+        return MaterialPageRoute(
+          builder: (context) => const OnboardingScreen(),
+        );
+      },
     );
   }
 }
-
