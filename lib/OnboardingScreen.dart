@@ -70,61 +70,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  void _navigateToSignUp() {
-    print('Get Started button pressed'); // Debug log
-    try {
-      Navigator.pushReplacementNamed(context, '/signup')
-          .then((_) {
-            print('Navigated to signup successfully');
-          })
-          .catchError((error) {
-            print('Navigation error: $error');
-            _showErrorDialog(
-              'Navigation Error',
-              'Could not navigate to Sign Up screen: $error',
-            );
-          });
-    } catch (e) {
-      print('Exception during navigation: $e');
-      _showErrorDialog('Error', 'An error occurred: $e');
-    }
+  void _navigateToUserTypeSelection() {
+    Navigator.pushReplacementNamed(context, '/user-type-selection');
   }
 
   void _navigateToLogin() {
-    print('Sign In button pressed'); // Debug log
-    try {
-      Navigator.pushReplacementNamed(context, '/login')
-          .then((_) {
-            print('Navigated to login successfully');
-          })
-          .catchError((error) {
-            print('Navigation error: $error');
-            _showErrorDialog(
-              'Navigation Error',
-              'Could not navigate to Login screen: $error',
-            );
-          });
-    } catch (e) {
-      print('Exception during navigation: $e');
-      _showErrorDialog('Error', 'An error occurred: $e');
-    }
-  }
-
-  void _showErrorDialog(String title, String message) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text(title),
-            content: Text(message),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-    );
+    Navigator.pushReplacementNamed(context, '/login');
   }
 
   @override
@@ -238,12 +189,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 child: Column(
                   children: [
                     if (_currentPage == _pages.length - 1) ...[
-                      // Get Started Button
+                      // Get Started Button - Now navigates to User Type Selection
                       SizedBox(
                         width: double.infinity,
                         height: 56,
                         child: ElevatedButton(
-                          onPressed: _navigateToSignUp,
+                          onPressed: _navigateToUserTypeSelection,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green.shade600,
                             foregroundColor: Colors.white,
