@@ -16,6 +16,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  
+  // Station owner specific fields
+  final _businessNameController = TextEditingController();
+  final _businessAddressController = TextEditingController();
+  
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -23,6 +28,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _agreeToTerms = false;
+  String _userType = 'customer'; // default
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Get user type from navigation arguments
+    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    if (args != null && args['userType'] != null) {
+      setState(() {
+        _userType = args['userType'] as String;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -31,6 +49,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _businessNameController.dispose();
+    _businessAddressController.dispose();
     super.dispose();
   }
 
@@ -63,18 +83,46 @@ class _SignUpScreenState extends State<SignUpScreen> {
           _nameController.text.trim(),
         );
 
-        // Store additional user data in Firestore
-        await _firestore.collection('users').doc(userCredential.user?.uid).set({
+        // Prepare user data based on user type
+        Map<String, dynamic> userData = {
           'name': _nameController.text.trim(),
           'email': _emailController.text.trim(),
           'phone': _phoneController.text.trim(),
+          'userType': _userType,
           'createdAt': FieldValue.serverTimestamp(),
           'profileComplete': false,
-        });
+        };
+
+        // Add station owner specific data
+        if (_userType == 'stationOwner') {
+          userData['businessName'] = _businessNameController.text.trim();
+          userData['businessAddress'] = _businessAddressController.text.trim();
+          userData['verificationStatus'] = 'pending';
+        }
+
+        // Store user data in Firestore
+        await _firestore.collection('users').doc(userCredential.user?.uid).set(userData);
+
+        // If station owner, create initial station document
+        if (_userType == 'stationOwner') {
+          await _firestore.collection('stations').add({
+            'ownerId': userCredential.user?.uid,
+            'ownerName': _nameController.text.trim(),
+            'businessName': _businessNameController.text.trim(),
+            'address': _businessAddressController.text.trim(),
+            'status': 'pending_setup',
+            'verified': false,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
 
         if (mounted) {
-          // Navigate to Home screen
-          Navigator.pushReplacementNamed(context, '/home');
+          // Navigate based on user type
+          if (_userType == 'stationOwner') {
+            Navigator.pushReplacementNamed(context, '/station-dashboard');
+          } else {
+            Navigator.pushReplacementNamed(context, '/home');
+          }
         }
       } on FirebaseAuthException catch (e) {
         String errorMessage = 'An error occurred';
@@ -114,7 +162,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   void _navigateToLogin() {
-    Navigator.pop(context);
+    Navigator.pushReplacementNamed(context, '/login');
+  }
+
+  String _getTitle() {
+    return _userType == 'stationOwner' 
+        ? 'Station Owner Registration' 
+        : 'Create Account';
+  }
+
+  String _getSubtitle() {
+    return _userType == 'stationOwner'
+        ? 'Register your charging station'
+        : 'Sign up to get started';
   }
 
   @override
@@ -159,7 +219,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Create Account',
+                    _getTitle(),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 24,
@@ -169,7 +229,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Sign up to get started',
+                    _getSubtitle(),
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
                   ),
@@ -225,6 +285,90 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           },
                         ),
                         const SizedBox(height: 16),
+
+                        // Station Owner Specific Fields
+                        if (_userType == 'stationOwner') ...[
+                          // Business Name
+                          TextFormField(
+                            controller: _businessNameController,
+                            keyboardType: TextInputType.text,
+                            textCapitalization: TextCapitalization.words,
+                            decoration: InputDecoration(
+                              labelText: 'Business/Station Name',
+                              hintText: 'Enter your station name',
+                              prefixIcon: Icon(
+                                Icons.business,
+                                color: Colors.green.shade600,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey.shade300,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.green.shade600,
+                                  width: 2,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your business name';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Business Address
+                          TextFormField(
+                            controller: _businessAddressController,
+                            keyboardType: TextInputType.streetAddress,
+                            textCapitalization: TextCapitalization.words,
+                            maxLines: 2,
+                            decoration: InputDecoration(
+                              labelText: 'Station Address',
+                              hintText: 'Enter your station address',
+                              prefixIcon: Icon(
+                                Icons.location_on,
+                                color: Colors.green.shade600,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey.shade300,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.green.shade600,
+                                  width: 2,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your station address';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                        ],
 
                         // Email Field
                         TextFormField(
@@ -491,9 +635,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           width: double.infinity,
                           height: 56,
                           child: ElevatedButton(
-                            // onPressed: () {
-                            //   Navigator.pushReplacementNamed(context, '/home');
-                            // },
                             onPressed: _isLoading ? null : _handleSignUp,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green.shade600,
@@ -548,7 +689,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
                   const SizedBox(height: 24),
 
-                  // Social Sign Up Buttons (Using Icons/Text instead of images)
+                  // Social Sign Up Buttons
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -563,7 +704,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         ),
                         child: IconButton(
                           onPressed: () {
-                            // Handle Google Sign Up
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Google Sign Up - Coming Soon'),
@@ -592,7 +732,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         ),
                         child: IconButton(
                           onPressed: () {
-                            // Handle Apple Sign Up
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Apple Sign Up - Coming Soon'),
