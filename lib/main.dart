@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:volt_find/HomeScreen.dart';
-import 'package:volt_find/OnboardingScreen.dart';
 import 'package:volt_find/LoginScreen.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:volt_find/SignupScreen.dart';
 import 'package:volt_find/ViewMapScreen.dart';
+import 'package:volt_find/presentation/screens/auth/OnboardingScreen.dart';
+import 'package:volt_find/presentation/screens/auth/SignupScreen.dart';
+import 'package:volt_find/presentation/screens/auth/UserTypeSelectionScreen.dart';
 import 'StationDashboardScreen';
-import 'UserTypeSelectionScreen.dart';
 import 'firebase_options.dart';
 
 void main() async {
