@@ -5,6 +5,7 @@ import 'package:volt_find/LoginScreen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:volt_find/SignupScreen.dart';
 import 'package:volt_find/ViewMapScreen.dart';
+import 'StationDashboardScreen';
 import 'UserTypeSelectionScreen.dart';
 import 'firebase_options.dart';
 
@@ -36,7 +37,8 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignUpScreen(),
         '/home': (context) => const HomeScreen(),
-        // '/view-map': (context) => const ViewMapScreen(),
+        '/station-dashboard': (context) => const StationDashboardScreen(),
+        '/view-map': (context) => const ViewMapScreen(),
       },
 
       // Handle undefined routes
