@@ -10,6 +10,7 @@ import 'package:volt_find/presentation/screens/auth/SignupScreen.dart';
 import 'package:volt_find/presentation/screens/auth/UserTypeSelectionScreen.dart';
 import 'package:volt_find/presentation/screens/customer/home/HomeScreen.dart';
 import 'package:volt_find/presentation/screens/customer/home/ViewMapScreen.dart';
+import 'package:volt_find/presentation/screens/customer/profile/settings_screen.dart';
 
 // Firebase config
 import 'firebase_options.dart';
@@ -148,7 +149,7 @@ class MyApp extends StatelessWidget {
         // '/search': (context) => SearchScreen(),
         // '/station-details': (context) => StationDetailsScreen(),
         // '/booking': (context) => BookingScreen(),
-        // '/settings': (context) => SettingsScreen(),
+        '/settings': (context) => SettingsScreen(),
         // '/edit-profile': (context) => EditProfileScreen(),
         // '/vehicle-info': (context) => VehicleInfoScreen(),
         // '/booking-history': (context) => BookingHistoryScreen(),
