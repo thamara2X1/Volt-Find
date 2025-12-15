@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -13,6 +14,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -31,14 +33,38 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       try {
+        // Sign in with email and password
         UserCredential userCredential = await _auth.signInWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
 
+        // Get user data from Firestore to check user type
+        DocumentSnapshot userDoc =
+            await _firestore
+                .collection('users')
+                .doc(userCredential.user?.uid)
+                .get();
+
         if (mounted) {
-          // Navigate to Home screen
-          Navigator.pushReplacementNamed(context, '/home');
+          if (userDoc.exists) {
+            // Get the user type
+            String userType =
+                userDoc.data() != null
+                    ? (userDoc.data() as Map<String, dynamic>)['userType'] ??
+                        'customer'
+                    : 'customer';
+
+            // Navigate based on user type
+            if (userType == 'stationOwner') {
+              Navigator.pushReplacementNamed(context, '/station-dashboard');
+            } else {
+              Navigator.pushReplacementNamed(context, '/home');
+            }
+          } else {
+            // If user document doesn't exist, default to customer home
+            Navigator.pushReplacementNamed(context, '/home');
+          }
         }
       } on FirebaseAuthException catch (e) {
         String errorMessage = 'An error occurred';
@@ -46,11 +72,13 @@ class _LoginScreenState extends State<LoginScreen> {
         if (e.code == 'user-not-found') {
           errorMessage = 'No user found with this email';
         } else if (e.code == 'wrong-password') {
-          errorMessage = 'Wrong password provided';
+          errorMessage = 'Incorrect password';
         } else if (e.code == 'invalid-email') {
           errorMessage = 'Invalid email address';
         } else if (e.code == 'user-disabled') {
           errorMessage = 'This account has been disabled';
+        } else if (e.code == 'invalid-credential') {
+          errorMessage = 'Invalid email or password';
         }
 
         if (mounted) {
@@ -62,7 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Failed to login. Please try again.'),
+              content: Text('Failed to sign in. Please try again.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -78,12 +106,41 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _navigateToSignUp() {
-    Navigator.pushNamed(context, '/signup');
+    Navigator.pushNamed(context, '/user-type-selection');
   }
 
-  void _navigateToForgotPassword() {
-    // Navigate to forgot password screen
-    Navigator.pushNamed(context, '/forgot-password');
+  void _handleForgotPassword() async {
+    if (_emailController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter your email address first'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      await _auth.sendPasswordResetEmail(email: _emailController.text.trim());
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Password reset email sent! Check your inbox.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -105,9 +162,10 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Padding(
               padding: const EdgeInsets.all(24.0),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const SizedBox(height: 40),
+
                   // Logo and Title
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -130,7 +188,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Welcome Back!',
+                    'Welcome Back',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 24,
@@ -260,7 +318,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
-                            onPressed: _navigateToForgotPassword,
+                            onPressed: _handleForgotPassword,
                             child: Text(
                               'Forgot Password?',
                               style: TextStyle(
@@ -277,11 +335,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           width: double.infinity,
                           height: 56,
                           child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.pushReplacementNamed(context, '/home');
-                            },
-
-                            //onPressed: _isLoading ? null : _handleLogin,
+                            onPressed: _isLoading ? null : _handleLogin,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green.shade600,
                               foregroundColor: Colors.white,
@@ -335,7 +389,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 24),
 
-                  // Social Login Buttons (Using Icons instead of images)
+                  // Social Sign In Buttons
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -350,7 +404,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         child: IconButton(
                           onPressed: () {
-                            // Handle Google Sign In
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Google Sign In - Coming Soon'),
@@ -379,7 +432,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         child: IconButton(
                           onPressed: () {
-                            // Handle Apple Sign In
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Apple Sign In - Coming Soon'),
@@ -396,7 +448,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: 32),
+                  const Spacer(),
 
                   // Sign Up Link
                   Row(
@@ -422,6 +474,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
