@@ -8,9 +8,14 @@ import 'package:volt_find/presentation/screens/auth/LoginScreen.dart';
 import 'package:volt_find/presentation/screens/auth/OnboardingScreen.dart';
 import 'package:volt_find/presentation/screens/auth/SignupScreen.dart';
 import 'package:volt_find/presentation/screens/auth/UserTypeSelectionScreen.dart';
+import 'package:volt_find/presentation/screens/customer/booking/book_now_screen.dart';
+import 'package:volt_find/presentation/screens/customer/booking/booking_confirmation_screen.dart';
 import 'package:volt_find/presentation/screens/customer/home/HomeScreen.dart';
 import 'package:volt_find/presentation/screens/customer/home/ViewMapScreen.dart';
+import 'package:volt_find/presentation/screens/customer/profile/booking_history_screen.dart';
 import 'package:volt_find/presentation/screens/customer/profile/settings_screen.dart';
+import 'package:volt_find/presentation/screens/customer/search/search_screen.dart';
+import 'package:volt_find/presentation/screens/customer/station/station_details_screen.dart';
 
 // Firebase config
 import 'firebase_options.dart';
@@ -139,20 +144,19 @@ class MyApp extends StatelessWidget {
         '/user-type-selection': (context) => const UserTypeSelectionScreen(),
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignUpScreen(),
+        '/search': (context) => const SearchScreen(),
         
         // Customer Routes
         '/home': (context) => const HomeScreen(),
         '/view-map': (context) => const ViewMapScreen(),
         '/profile': (context) => const EditProfileScreen(), // Added profile route
-        
-        // Add other routes here:
-        // '/search': (context) => SearchScreen(),
-        // '/station-details': (context) => StationDetailsScreen(),
-        // '/booking': (context) => BookingScreen(),
+        '/station-details': (context) => const StationDetailsScreen(),
+        '/book-now': (context) => const BookNowScreen(),
+        '/booking-confirmation': (context) => const BookingConfirmationScreen(),
         '/settings': (context) => SettingsScreen(),
         // '/edit-profile': (context) => EditProfileScreen(),
         // '/vehicle-info': (context) => VehicleInfoScreen(),
-        // '/booking-history': (context) => BookingHistoryScreen(),
+        '/booking-history': (context) => BookingHistoryScreen(),
       },
 
       // Handle undefined routes
