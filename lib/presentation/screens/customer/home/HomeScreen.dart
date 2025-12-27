@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
+import 'dart:math' show cos, sqrt, asin;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -10,12 +13,79 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  
   User? _currentUser;
+  Position? _currentPosition;
+  bool _isLoadingLocation = false;
 
   @override
   void initState() {
     super.initState();
     _currentUser = _auth.currentUser;
+    _getCurrentLocation();
+  }
+
+  Future<void> _getCurrentLocation() async {
+    setState(() {
+      _isLoadingLocation = true;
+    });
+
+    try {
+      // Check location permission
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        // Show error to user
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Location permissions are permanently denied'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      if (permission == LocationPermission.denied) {
+        return;
+      }
+
+      // Get current position
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      setState(() {
+        _currentPosition = position;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to get location: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isLoadingLocation = false;
+      });
+    }
+  }
+
+  // Calculate distance between two coordinates in kilometers
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const p = 0.017453292519943295; // Math.PI / 180
+    final a = 0.5 -
+        cos((lat2 - lat1) * p) / 2 +
+        cos(lat1 * p) * cos(lat2 * p) * (1 - cos((lon2 - lon1) * p)) / 2;
+    return 12742 * asin(sqrt(a)); // 2 * R; R = 6371 km
   }
 
   void _navigateToProfile() {
@@ -97,7 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Icon(Icons.electric_bolt, color: Colors.white),
                   const SizedBox(width: 8),
                   const Text(
-                    'ChargePoint',
+                    'VoltFind',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -108,7 +178,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               actions: [
                 IconButton(
-                  icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+                  icon: const Icon(Icons.notifications_outlined,
+                      color: Colors.white),
                   onPressed: () {
                     // Handle notifications
                   },
@@ -162,7 +233,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           GestureDetector(
                             onTap: _navigateToSearch,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 16),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(16),
@@ -176,7 +248,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.search, color: Colors.grey.shade600),
+                                  Icon(Icons.search,
+                                      color: Colors.grey.shade600),
                                   const SizedBox(width: 12),
                                   Text(
                                     'Search charging stations...',
@@ -259,7 +332,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   const SizedBox(height: 32),
 
-                  // Nearby Stations
+                  // Nearby Stations Header
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Row(
@@ -288,50 +361,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   const SizedBox(height: 12),
 
-                  // Station Cards List
-                  _buildStationCard(
-                    name: 'Tesla Supercharger Station',
-                    distance: '0.8 km',
-                    availability: 'Available',
-                    availableSlots: 8,
-                    totalSlots: 12,
-                    price: 'Rs. 45/kWh',
-                    rating: 4.5,
-                    isAvailable: true,
-                  ),
-
-                  _buildStationCard(
-                    name: 'EV Power Hub',
-                    distance: '1.2 km',
-                    availability: 'Available',
-                    availableSlots: 3,
-                    totalSlots: 6,
-                    price: 'Rs. 40/kWh',
-                    rating: 4.2,
-                    isAvailable: true,
-                  ),
-
-                  _buildStationCard(
-                    name: 'City Charge Station',
-                    distance: '1.8 km',
-                    availability: 'Busy',
-                    availableSlots: 1,
-                    totalSlots: 8,
-                    price: 'Rs. 50/kWh',
-                    rating: 4.7,
-                    isAvailable: true,
-                  ),
-
-                  _buildStationCard(
-                    name: 'Mall Parking Charger',
-                    distance: '2.3 km',
-                    availability: 'Full',
-                    availableSlots: 0,
-                    totalSlots: 10,
-                    price: 'Rs. 55/kWh',
-                    rating: 4.0,
-                    isAvailable: false,
-                  ),
+                  // Real-time Station Cards List
+                  _buildRealTimeStationsList(),
 
                   const SizedBox(height: 24),
                 ],
@@ -393,7 +424,145 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Real-time stations list using StreamBuilder
+  Widget _buildRealTimeStationsList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore
+          .collection('stations')
+          .where('verified', isEqualTo: true)
+          .where('isOperational', isEqualTo: true)
+          .orderBy('createdAt', descending: true)
+          .limit(10) // Limit to 10 stations for performance
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Center(
+              child: Column(
+                children: [
+                  Icon(Icons.error_outline, size: 48, color: Colors.red.shade300),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error loading stations',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {}); // Trigger rebuild
+                    },
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Padding(
+            padding: const EdgeInsets.all(48.0),
+            child: Center(
+              child: CircularProgressIndicator(
+                color: Colors.green.shade600,
+              ),
+            ),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Center(
+              child: Column(
+                children: [
+                  Icon(Icons.ev_station_outlined,
+                      size: 64, color: Colors.grey.shade300),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No charging stations found nearby',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: _navigateToSearch,
+                    child: const Text('Search stations'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // Build list of stations
+        final stations = snapshot.data!.docs;
+
+        return Column(
+          children: stations.map((stationDoc) {
+            final data = stationDoc.data() as Map<String, dynamic>;
+            final stationId = stationDoc.id;
+
+            // Extract station data
+            final name = data['businessName'] ?? data['name'] ?? 'Unknown Station';
+            final address = data['address'] ?? 'Address not available';
+            final availableSlots = data['availableSlots'] ?? 0;
+            final totalSlots = data['totalSlots'] ?? 0;
+            final pricePerKwh = data['pricePerKwh'] ?? 0.0;
+            final rating = (data['rating'] ?? 4.0).toDouble();
+
+            // Calculate distance if location is available
+            String distance = 'N/A';
+            if (_currentPosition != null && data['location'] != null) {
+              final GeoPoint location = data['location'];
+              final distanceKm = _calculateDistance(
+                _currentPosition!.latitude,
+                _currentPosition!.longitude,
+                location.latitude,
+                location.longitude,
+              );
+              distance = '${distanceKm.toStringAsFixed(1)} km';
+            }
+
+            // Determine availability status
+            String availability;
+            bool isAvailable;
+            if (availableSlots == 0) {
+              availability = 'Full';
+              isAvailable = false;
+            } else if (availableSlots <= totalSlots * 0.25) {
+              availability = 'Busy';
+              isAvailable = true;
+            } else {
+              availability = 'Available';
+              isAvailable = true;
+            }
+
+            return _buildStationCard(
+              stationId: stationId,
+              name: name,
+              distance: distance,
+              availability: availability,
+              availableSlots: availableSlots,
+              totalSlots: totalSlots,
+              price: 'Rs. ${pricePerKwh.toStringAsFixed(0)}/kWh',
+              rating: rating,
+              isAvailable: isAvailable,
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
   Widget _buildStationCard({
+    required String stationId,
     required String name,
     required String distance,
     required String availability,
@@ -404,7 +573,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required bool isAvailable,
   }) {
     return GestureDetector(
-      onTap: () => _navigateToStationDetails('station_id_123'),
+      onTap: () => _navigateToStationDetails(stationId),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
         padding: const EdgeInsets.all(16),
@@ -434,11 +603,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(Icons.location_on, size: 16, color: Colors.grey.shade600),
+                          Icon(Icons.location_on,
+                              size: 16, color: Colors.grey.shade600),
                           const SizedBox(width: 4),
                           Text(
                             distance,
@@ -453,9 +625,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: isAvailable ? Colors.green.shade50 : Colors.red.shade50,
+                    color: isAvailable
+                        ? Colors.green.shade50
+                        : Colors.red.shade50,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -463,7 +638,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: isAvailable ? Colors.green.shade700 : Colors.red.shade700,
+                      color: isAvailable
+                          ? Colors.green.shade700
+                          : Colors.red.shade700,
                     ),
                   ),
                 ),
@@ -475,7 +652,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(
                   child: Row(
                     children: [
-                      Icon(Icons.ev_station, size: 18, color: Colors.grey.shade600),
+                      Icon(Icons.ev_station,
+                          size: 18, color: Colors.grey.shade600),
                       const SizedBox(width: 6),
                       Text(
                         '$availableSlots/$totalSlots Available',
