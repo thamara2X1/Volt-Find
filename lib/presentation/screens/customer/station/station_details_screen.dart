@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class StationDetailsScreen extends StatefulWidget {
   const StationDetailsScreen({Key? key}) : super(key: key);
@@ -10,77 +10,9 @@ class StationDetailsScreen extends StatefulWidget {
 
 class _StationDetailsScreenState extends State<StationDetailsScreen>
     with SingleTickerProviderStateMixin {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   late TabController _tabController;
   String? _stationId;
-
-  // Mock station data (in real app, fetch from Firebase using stationId)
-  final ChargingStation _station = ChargingStation(
-    id: '1',
-    name: 'Tesla Supercharger Station',
-    position: const LatLng(6.5854, 79.9607),
-    address: 'Kalutara Main Road, Kalutara',
-    distance: 0.8,
-    availableSlots: 8,
-    totalSlots: 12,
-    pricePerKwh: 45.0,
-    rating: 4.5,
-    connectorTypes: ['Type 2', 'CCS'],
-    isAvailable: true,
-    amenities: ['WiFi', 'Cafe', 'Restroom', 'Parking', 'ATM'],
-    totalReviews: 124,
-    operatingHours: '24/7',
-    phoneNumber: '+94 77 123 4567',
-    description:
-        'High-speed charging station with modern amenities. Located conveniently on the main road with easy access.',
-    photos: [
-      'https://via.placeholder.com/400x300/4CAF50/FFFFFF?text=Station+Photo+1',
-      'https://via.placeholder.com/400x300/2196F3/FFFFFF?text=Station+Photo+2',
-      'https://via.placeholder.com/400x300/FF9800/FFFFFF?text=Station+Photo+3',
-    ],
-  );
-
-  // Mock reviews data
-  final List<Review> _reviews = [
-    Review(
-      id: '1',
-      userName: 'John Doe',
-      userAvatar: 'JD',
-      rating: 5.0,
-      comment:
-          'Excellent charging station! Fast charging and great amenities. The cafe is a nice touch.',
-      date: DateTime.now().subtract(const Duration(days: 2)),
-      helpful: 12,
-    ),
-    Review(
-      id: '2',
-      userName: 'Sarah Smith',
-      userAvatar: 'SS',
-      rating: 4.0,
-      comment:
-          'Good location and clean facilities. Sometimes gets crowded during peak hours.',
-      date: DateTime.now().subtract(const Duration(days: 5)),
-      helpful: 8,
-    ),
-    Review(
-      id: '3',
-      userName: 'Mike Johnson',
-      userAvatar: 'MJ',
-      rating: 5.0,
-      comment:
-          'Best charging station in the area! Staff is helpful and the charging speed is amazing.',
-      date: DateTime.now().subtract(const Duration(days: 7)),
-      helpful: 15,
-    ),
-    Review(
-      id: '4',
-      userName: 'Emma Wilson',
-      userAvatar: 'EW',
-      rating: 4.0,
-      comment: 'Good facilities but pricing could be better. Overall satisfied with the service.',
-      date: DateTime.now().subtract(const Duration(days: 10)),
-      helpful: 6,
-    ),
-  ];
 
   @override
   void initState() {
@@ -93,6 +25,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
     super.didChangeDependencies();
     // Get station ID from route arguments
     _stationId = ModalRoute.of(context)?.settings.arguments as String?;
+    print('📍 Station Details - Station ID: $_stationId');
   }
 
   @override
@@ -101,18 +34,18 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
     super.dispose();
   }
 
-  void _navigateToBooking() {
-    Navigator.pushNamed(context, '/book-now', arguments: _station.id);
+  void _navigateToBooking(String stationId) {
+    Navigator.pushNamed(context, '/book-now', arguments: stationId);
   }
 
   void _navigateToMap() {
     Navigator.pushNamed(context, '/view-map');
   }
 
-  void _makePhoneCall() {
+  void _makePhoneCall(String phoneNumber) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Calling ${_station.phoneNumber}...'),
+        content: Text('Calling $phoneNumber...'),
         backgroundColor: Colors.green.shade600,
       ),
     );
@@ -132,6 +65,117 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_stationId == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Station Details'),
+          backgroundColor: Colors.green.shade600,
+        ),
+        body: const Center(
+          child: Text('Station not found'),
+        ),
+      );
+    }
+
+    // ✅ REAL-TIME UPDATES: Use StreamBuilder to listen to station changes
+    return StreamBuilder<DocumentSnapshot>(
+      stream: _firestore.collection('stations').doc(_stationId).snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Station Details'),
+              backgroundColor: Colors.green.shade600,
+            ),
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
+                  const SizedBox(height: 16),
+                  Text('Error loading station: ${snapshot.error}'),
+                ],
+              ),
+            ),
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Station Details'),
+              backgroundColor: Colors.green.shade600,
+            ),
+            body: Center(
+              child: CircularProgressIndicator(color: Colors.green.shade600),
+            ),
+          );
+        }
+
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Station Details'),
+              backgroundColor: Colors.green.shade600,
+            ),
+            body: const Center(
+              child: Text('Station not found'),
+            ),
+          );
+        }
+
+        // Extract station data
+        final stationData = snapshot.data!.data() as Map<String, dynamic>;
+        
+        final name = stationData['businessName'] ?? stationData['name'] ?? 'Charging Station';
+        final address = stationData['address'] ?? 'Address not available';
+        final availableSlots = stationData['availableSlots'] ?? 0;
+        final totalSlots = stationData['totalSlots'] ?? 0;
+        final pricePerKwh = stationData['pricePerKwh'] ?? 0.0;
+        final rating = (stationData['rating'] ?? 4.0).toDouble();
+        final connectorTypes = List<String>.from(stationData['connectorTypes'] ?? ['Type 2']);
+        final amenities = List<String>.from(stationData['amenities'] ?? ['Parking']);
+        final description = stationData['description'] ?? 'EV Charging Station';
+        final isOperational = stationData['isOperational'] ?? false;
+        final verified = stationData['verified'] ?? false;
+        
+        // Determine availability
+        final isAvailable = isOperational && availableSlots > 0;
+
+        print('🔄 Station data updated: $name - $availableSlots/$totalSlots available');
+
+        return _buildStationDetails(
+          stationId: _stationId!,
+          name: name,
+          address: address,
+          availableSlots: availableSlots,
+          totalSlots: totalSlots,
+          pricePerKwh: pricePerKwh,
+          rating: rating,
+          connectorTypes: connectorTypes,
+          amenities: amenities,
+          description: description,
+          isAvailable: isAvailable,
+          verified: verified,
+        );
+      },
+    );
+  }
+
+  Widget _buildStationDetails({
+    required String stationId,
+    required String name,
+    required String address,
+    required int availableSlots,
+    required int totalSlots,
+    required double pricePerKwh,
+    required double rating,
+    required List<String> connectorTypes,
+    required List<String> amenities,
+    required String description,
+    required bool isAvailable,
+    required bool verified,
+  }) {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -144,20 +188,14 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Station Image
-                  Image.network(
-                    _station.photos.first,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: Colors.green.shade600,
-                        child: const Icon(
-                          Icons.ev_station,
-                          size: 80,
-                          color: Colors.white,
-                        ),
-                      );
-                    },
+                  // Station Image (placeholder)
+                  Container(
+                    color: Colors.green.shade600,
+                    child: const Icon(
+                      Icons.ev_station,
+                      size: 80,
+                      color: Colors.white,
+                    ),
                   ),
                   // Gradient Overlay
                   Container(
@@ -168,6 +206,34 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
                         colors: [
                           Colors.transparent,
                           Colors.black.withOpacity(0.7),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Real-time Update Indicator
+                  Positioned(
+                    top: 16,
+                    right: 16,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.wifi, color: Colors.white, size: 14),
+                          SizedBox(width: 4),
+                          Text(
+                            'Live',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -204,28 +270,29 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
                         children: [
                           Expanded(
                             child: Text(
-                              _station.name,
+                              name,
                               style: const TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
+                          // ✅ Real-time availability status
                           Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                              color: _station.isAvailable
+                              color: isAvailable
                                   ? Colors.green.shade50
                                   : Colors.red.shade50,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              _station.isAvailable ? 'Available' : 'Full',
+                              isAvailable ? 'Available' : 'Full',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: _station.isAvailable
+                                color: isAvailable
                                     ? Colors.green.shade700
                                     : Colors.red.shade700,
                               ),
@@ -235,13 +302,13 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
                       ),
                       const SizedBox(height: 12),
 
-                      // Rating and Reviews
+                      // Rating
                       Row(
                         children: [
                           Icon(Icons.star, size: 20, color: Colors.amber.shade600),
                           const SizedBox(width: 4),
                           Text(
-                            '${_station.rating}',
+                            rating.toStringAsFixed(1),
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -249,22 +316,33 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            '(${_station.totalReviews} reviews)',
+                            '(Reviews)',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey.shade600,
                             ),
                           ),
-                          const SizedBox(width: 16),
-                          Icon(Icons.location_on, size: 18, color: Colors.grey.shade600),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${_station.distance.toStringAsFixed(1)} km away',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
+                          if (!verified) ...[
+                            const SizedBox(width: 16),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade50,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'Pending Verification',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.orange.shade700,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -276,7 +354,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              _station.address,
+                              address,
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey.shade700,
@@ -306,7 +384,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
                       _buildQuickAction(
                         icon: Icons.phone,
                         label: 'Call',
-                        onTap: _makePhoneCall,
+                        onTap: () => _makePhoneCall('+94 77 123 4567'),
                       ),
                       _buildQuickAction(
                         icon: Icons.share_location,
@@ -329,8 +407,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
                     indicatorColor: Colors.green.shade600,
                     tabs: const [
                       Tab(text: 'Overview'),
+                      Tab(text: 'Details'),
                       Tab(text: 'Reviews'),
-                      Tab(text: 'Photos'),
                     ],
                   ),
                 ),
@@ -341,9 +419,17 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
                   child: TabBarView(
                     controller: _tabController,
                     children: [
-                      _buildOverviewTab(),
-                      _buildReviewsTab(),
-                      _buildPhotosTab(),
+                      _buildOverviewTab(
+                        description: description,
+                        availableSlots: availableSlots,
+                        totalSlots: totalSlots,
+                        pricePerKwh: pricePerKwh,
+                      ),
+                      _buildDetailsTab(
+                        connectorTypes: connectorTypes,
+                        amenities: amenities,
+                      ),
+                      _buildReviewsTab(rating: rating),
                     ],
                   ),
                 ),
@@ -354,7 +440,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
       ),
 
       // Bottom Bar with Book Button
-      bottomNavigationBar: _station.isAvailable
+      bottomNavigationBar: isAvailable
           ? Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -371,7 +457,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
                 child: SizedBox(
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: _navigateToBooking,
+                    onPressed: () => _navigateToBooking(stationId),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green.shade600,
                       foregroundColor: Colors.white,
@@ -390,7 +476,39 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
                 ),
               ),
             )
-          : null,
+          : Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                child: Container(
+                  height: 56,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'No Slots Available',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.red.shade700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
     );
   }
 
@@ -432,7 +550,12 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
     );
   }
 
-  Widget _buildOverviewTab() {
+  Widget _buildOverviewTab({
+    required String description,
+    required int availableSlots,
+    required int totalSlots,
+    required double pricePerKwh,
+  }) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -457,7 +580,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _station.description,
+                  description,
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.grey.shade700,
@@ -470,42 +593,124 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
 
           const SizedBox(height: 16),
 
-          // Availability
+          // ✅ Real-time Availability Display
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: availableSlots > 0 
+                    ? Colors.green.shade200 
+                    : Colors.red.shade200,
+                width: 2,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Availability',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
                 Row(
                   children: [
-                    Icon(Icons.ev_station, color: Colors.grey.shade700),
+                    Icon(
+                      Icons.ev_station,
+                      color: availableSlots > 0 
+                          ? Colors.green.shade700 
+                          : Colors.red.shade700,
+                    ),
                     const SizedBox(width: 12),
-                    Text(
-                      'Available Slots: ${_station.availableSlots}/${_station.totalSlots}',
-                      style: const TextStyle(fontSize: 14),
+                    const Text(
+                      'Availability',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.update, size: 12, color: Colors.blue.shade700),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Live',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.blue.shade700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 16),
                 Row(
                   children: [
-                    Icon(Icons.access_time, color: Colors.grey.shade700),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Operating Hours: ${_station.operatingHours}',
-                      style: const TextStyle(fontSize: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Available Slots',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '$availableSlots / $totalSlots',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: availableSlots > 0 
+                                  ? Colors.green.shade700 
+                                  : Colors.red.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      width: 100,
+                      height: 100,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          CircularProgressIndicator(
+                            value: totalSlots > 0 ? availableSlots / totalSlots : 0,
+                            strokeWidth: 8,
+                            backgroundColor: Colors.grey.shade200,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              availableSlots > 0 
+                                  ? Colors.green.shade600 
+                                  : Colors.red.shade600,
+                            ),
+                          ),
+                          Center(
+                            child: Text(
+                              totalSlots > 0 
+                                  ? '${((availableSlots / totalSlots) * 100).toInt()}%'
+                                  : '0%',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey.shade800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -515,7 +720,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
 
           const SizedBox(height: 16),
 
-          // Pricing
+          // ✅ Real-time Pricing Display
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -538,9 +743,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
                     Icon(Icons.payments, color: Colors.grey.shade700),
                     const SizedBox(width: 12),
                     Text(
-                      'Rs. ${_station.pricePerKwh.toStringAsFixed(0)}/kWh',
+                      'Rs. ${pricePerKwh.toStringAsFixed(0)}/kWh',
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 18,
                         fontWeight: FontWeight.w600,
                         color: Colors.green.shade700,
                       ),
@@ -553,6 +758,38 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
 
           const SizedBox(height: 16),
 
+          // Operating Hours
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.access_time, color: Colors.grey.shade700),
+                const SizedBox(width: 12),
+                const Text(
+                  'Operating Hours: 24/7',
+                  style: TextStyle(fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailsTab({
+    required List<String> connectorTypes,
+    required List<String> amenities,
+  }) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           // Connector Types
           Container(
             padding: const EdgeInsets.all(16),
@@ -574,7 +811,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: _station.connectorTypes
+                  children: connectorTypes
                       .map((type) => Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 8),
@@ -620,7 +857,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
                 Wrap(
                   spacing: 16,
                   runSpacing: 12,
-                  children: _station.amenities
+                  children: amenities
                       .map((amenity) => Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -643,229 +880,31 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
     );
   }
 
-  Widget _buildReviewsTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+  Widget _buildReviewsTab({required double rating}) {
+    return Center(
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Overall Rating
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Column(
-                  children: [
-                    Text(
-                      _station.rating.toString(),
-                      style: const TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Row(
-                      children: List.generate(
-                        5,
-                        (index) => Icon(
-                          index < _station.rating.floor()
-                              ? Icons.star
-                              : Icons.star_border,
-                          color: Colors.amber.shade600,
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${_station.totalReviews} reviews',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 32),
-                Expanded(
-                  child: Column(
-                    children: [
-                      _buildRatingBar(5, 78),
-                      _buildRatingBar(4, 42),
-                      _buildRatingBar(3, 18),
-                      _buildRatingBar(2, 8),
-                      _buildRatingBar(1, 2),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Write Review Button
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                // Show write review dialog
-              },
-              icon: const Icon(Icons.rate_review),
-              label: const Text('Write a Review'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                side: BorderSide(color: Colors.green.shade600),
-                foregroundColor: Colors.green.shade700,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Reviews List
-          ..._reviews.map((review) => _buildReviewCard(review)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRatingBar(int stars, int percentage) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Text('$stars', style: const TextStyle(fontSize: 12)),
-          const SizedBox(width: 8),
-          Expanded(
-            child: LinearProgressIndicator(
-              value: percentage / 100,
-              backgroundColor: Colors.grey.shade200,
-              valueColor: AlwaysStoppedAnimation(Colors.amber.shade600),
-              minHeight: 6,
-              borderRadius: BorderRadius.circular(3),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text('$percentage%',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReviewCard(Review review) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: Colors.green.shade600,
-                child: Text(
-                  review.userAvatar,
-                  style: const TextStyle(color: Colors.white),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      review.userName,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        ...List.generate(
-                          5,
-                          (index) => Icon(
-                            index < review.rating.floor()
-                                ? Icons.star
-                                : Icons.star_border,
-                            color: Colors.amber.shade600,
-                            size: 14,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _formatDate(review.date),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
+          Icon(Icons.rate_review_outlined, size: 64, color: Colors.grey.shade300),
+          const SizedBox(height: 16),
           Text(
-            review.comment,
-            style: const TextStyle(fontSize: 14, height: 1.5),
+            'No Reviews Yet',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade600,
+            ),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              TextButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.thumb_up_outlined, size: 16),
-                label: Text('Helpful (${review.helpful})'),
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.grey.shade700,
-                  padding: EdgeInsets.zero,
-                ),
-              ),
-            ],
+          const SizedBox(height: 8),
+          Text(
+            'Be the first to review this station',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade500,
+            ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildPhotosTab() {
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      ),
-      itemCount: _station.photos.length,
-      itemBuilder: (context, index) {
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.network(
-            _station.photos[index],
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                color: Colors.grey.shade300,
-                child: const Icon(Icons.image, size: 50),
-              );
-            },
-          ),
-        );
-      },
     );
   }
 
@@ -874,89 +913,23 @@ class _StationDetailsScreenState extends State<StationDetailsScreen>
       case 'wifi':
         return Icons.wifi;
       case 'cafe':
+      case 'coffee shop':
         return Icons.local_cafe;
       case 'restroom':
+      case 'restrooms':
         return Icons.wc;
       case 'parking':
         return Icons.local_parking;
       case 'atm':
         return Icons.atm;
-      case 'shopping':
-        return Icons.shopping_bag;
+      case 'restaurant':
+        return Icons.restaurant;
+      case 'waiting area':
+        return Icons.weekend;
+      case 'security':
+        return Icons.security;
       default:
         return Icons.check_circle;
     }
   }
-
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date).inDays;
-
-    if (difference == 0) return 'Today';
-    if (difference == 1) return 'Yesterday';
-    if (difference < 7) return '$difference days ago';
-    if (difference < 30) return '${(difference / 7).floor()} weeks ago';
-    return '${(difference / 30).floor()} months ago';
-  }
-}
-
-// Models
-class ChargingStation {
-  final String id;
-  final String name;
-  final LatLng position;
-  final String address;
-  final double distance;
-  final int availableSlots;
-  final int totalSlots;
-  final double pricePerKwh;
-  final double rating;
-  final List<String> connectorTypes;
-  final bool isAvailable;
-  final List<String> amenities;
-  final int totalReviews;
-  final String operatingHours;
-  final String phoneNumber;
-  final String description;
-  final List<String> photos;
-
-  ChargingStation({
-    required this.id,
-    required this.name,
-    required this.position,
-    required this.address,
-    required this.distance,
-    required this.availableSlots,
-    required this.totalSlots,
-    required this.pricePerKwh,
-    required this.rating,
-    required this.connectorTypes,
-    required this.isAvailable,
-    required this.amenities,
-    required this.totalReviews,
-    required this.operatingHours,
-    required this.phoneNumber,
-    required this.description,
-    required this.photos,
-  });
-}
-
-class Review {
-  final String id;
-  final String userName;
-  final String userAvatar;
-  final double rating;
-  final String comment;
-  final DateTime date;
-  final int helpful;
-
-  Review({
-    required this.id,
-    required this.userName,
-    required this.userAvatar,
-    required this.rating,
-    required this.comment,
-    required this.date,
-    required this.helpful,
-  });
 }
