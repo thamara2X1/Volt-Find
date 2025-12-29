@@ -16,24 +16,18 @@ import 'package:volt_find/presentation/screens/customer/profile/booking_history_
 import 'package:volt_find/presentation/screens/customer/profile/settings_screen.dart';
 import 'package:volt_find/presentation/screens/customer/search/search_screen.dart';
 import 'package:volt_find/presentation/screens/customer/station/station_details_screen.dart';
+import 'package:volt_find/presentation/screens/customer/profile/profile_screen.dart';
+
+// Station Owner Screens
+import 'package:volt_find/presentation/screens/station_owner/station_dashboard_screen.dart';
+import 'package:volt_find/presentation/screens/station_owner/update_availability_screen.dart';
+import 'package:volt_find/presentation/screens/station_owner/edit_station_screen.dart';
 
 // Firebase config
 import 'firebase_options.dart';
 
-// Presentation layer screens
-// import 'presentation/screens/auth/onboarding_screen.dart';
-// import 'presentation/screens/auth/login_screen.dart';
-// import 'presentation/screens/auth/signup_screen.dart';
-// import 'presentation/screens/auth/user_type_selection_screen.dart';
-// import 'presentation/screens/customer/home/home_screen.dart';
-// import 'presentation/screens/customer/home/view_map_screen.dart';
-import 'presentation/screens/customer/profile/profile_screen.dart'; // Added profile screen
-
 // Providers
 import 'presentation/providers/user_provider.dart';
-
-// Data layer
-// import 'data/repositories/user_repository_impl.dart';
 
 // Domain layer use cases
 import 'domain/usecases/user/get_user_usecase.dart';
@@ -137,26 +131,30 @@ class MyApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      initialRoute: '/onboarding',
+      // ✅ CRITICAL: Use AuthWrapper instead of fixed initialRoute
+      home: const AuthWrapper(),
       routes: {
         // Auth Routes
         '/onboarding': (context) => const OnboardingScreen(),
         '/user-type-selection': (context) => const UserTypeSelectionScreen(),
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignUpScreen(),
-        '/search': (context) => const SearchScreen(),
         
         // Customer Routes
         '/home': (context) => const HomeScreen(),
         '/view-map': (context) => const ViewMapScreen(),
-        '/profile': (context) => const EditProfileScreen(), // Added profile route
+        '/search': (context) => const SearchScreen(),
+        '/profile': (context) => const EditProfileScreen(),
         '/station-details': (context) => const StationDetailsScreen(),
         '/book-now': (context) => const BookNowScreen(),
         '/booking-confirmation': (context) => const BookingConfirmationScreen(),
         '/settings': (context) => SettingsScreen(),
-        // '/edit-profile': (context) => EditProfileScreen(),
-        // '/vehicle-info': (context) => VehicleInfoScreen(),
         '/booking-history': (context) => BookingHistoryScreen(),
+        
+        // Station Owner Routes
+        '/station-dashboard': (context) => const StationDashboardScreen(),
+        '/update-availability': (context) => const UpdateAvailabilityScreen(),
+        '/edit-station': (context) => const EditStationScreen(),
       },
 
       // Handle undefined routes
@@ -164,6 +162,127 @@ class MyApp extends StatelessWidget {
         return MaterialPageRoute(
           builder: (context) => const OnboardingScreen(),
         );
+      },
+    );
+  }
+}
+
+/// AuthWrapper - Checks authentication state and routes accordingly
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<firebase_auth.User?>(
+      stream: firebase_auth.FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        // Show loading while checking auth state
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    color: Colors.green.shade600,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Loading...',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // If user is logged in
+        if (snapshot.hasData && snapshot.data != null) {
+          print('✅ User is logged in: ${snapshot.data!.uid}');
+          return UserTypeRouter(user: snapshot.data!);
+        }
+
+        // If no user is logged in, show onboarding
+        print('❌ No user logged in, showing onboarding');
+        return const OnboardingScreen();
+      },
+    );
+  }
+}
+
+/// UserTypeRouter - Fetches user type and routes to correct screen
+class UserTypeRouter extends StatelessWidget {
+  final firebase_auth.User user;
+
+  const UserTypeRouter({Key? key, required this.user}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get(),
+      builder: (context, snapshot) {
+        // Show loading while fetching user data
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    color: Colors.green.shade600,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Loading your profile...',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // If error occurred or no data
+        if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
+          print('❌ Error fetching user data or document does not exist');
+          // Sign out user and return to login
+          firebase_auth.FirebaseAuth.instance.signOut();
+          return const LoginScreen();
+        }
+
+        // Get user type from Firestore
+        final userData = snapshot.data!.data() as Map<String, dynamic>?;
+        final userType = userData?['userType'] ?? 'customer';
+        final isActive = userData?['isActive'] ?? true;
+
+        print('✅ User type: $userType');
+        print('✅ Active status: $isActive');
+
+        // Check if user is active
+        if (!isActive) {
+          print('❌ User is not active');
+          firebase_auth.FirebaseAuth.instance.signOut();
+          return const LoginScreen();
+        }
+
+        // Navigate based on user type
+        if (userType == 'stationOwner') {
+          print('🚗 Routing to Station Dashboard');
+          return const StationDashboardScreen();
+        } else {
+          print('🏠 Routing to Home Screen');
+          return const HomeScreen();
+        }
       },
     );
   }

@@ -70,20 +70,25 @@ class _SignUpScreenState extends State<SignUpScreen> {
         _isLoading = true;
       });
 
-      try {
-        // Create user with email and password
-        UserCredential userCredential = await _auth
-            .createUserWithEmailAndPassword(
-              email: _emailController.text.trim(),
-              password: _passwordController.text.trim(),
-            );
+      UserCredential? userCredential;
 
-        // Update display name
+      try {
+        // Step 1: Create user with email and password
+        print('Creating user account...');
+        userCredential = await _auth.createUserWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
+
+        print('User account created: ${userCredential.user?.uid}');
+
+        // Step 2: Update display name
         await userCredential.user?.updateDisplayName(
           _nameController.text.trim(),
         );
+        print('Display name updated');
 
-        // Prepare user data based on user type
+        // Step 3: Prepare user data based on user type
         Map<String, dynamic> userData = {
           'name': _nameController.text.trim(),
           'email': _emailController.text.trim(),
@@ -91,6 +96,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           'userType': _userType,
           'createdAt': FieldValue.serverTimestamp(),
           'profileComplete': false,
+          'isActive': true,
         };
 
         // Add station owner specific data
@@ -98,26 +104,59 @@ class _SignUpScreenState extends State<SignUpScreen> {
           userData['businessName'] = _businessNameController.text.trim();
           userData['businessAddress'] = _businessAddressController.text.trim();
           userData['verificationStatus'] = 'pending';
+          print('Station owner data prepared');
         }
 
-        // Store user data in Firestore
-        await _firestore.collection('users').doc(userCredential.user?.uid).set(userData);
+        // Step 4: Store user data in Firestore
+        await _firestore
+            .collection('users')
+            .doc(userCredential.user?.uid)
+            .set(userData);
+        print('User data saved to Firestore');
 
-        // If station owner, create initial station document
+        // Step 5: If station owner, create initial station document
         if (_userType == 'stationOwner') {
-          await _firestore.collection('stations').add({
+          final stationData = {
             'ownerId': userCredential.user?.uid,
             'ownerName': _nameController.text.trim(),
             'businessName': _businessNameController.text.trim(),
+            'name': _businessNameController.text.trim(), // Add name field for consistency
             'address': _businessAddressController.text.trim(),
             'status': 'pending_setup',
             'verified': false,
+            'isOperational': false, // Not operational until setup is complete
+            'availableSlots': 0,
+            'totalSlots': 0,
+            'pricePerKwh': 0.0,
+            'rating': 0.0,
+            'connectorTypes': [],
+            'amenities': [],
             'createdAt': FieldValue.serverTimestamp(),
-          });
+            'lastUpdated': FieldValue.serverTimestamp(),
+          };
+
+          await _firestore.collection('stations').add(stationData);
+          print('Station document created');
         }
 
+        // Step 6: Show success message
         if (mounted) {
-          // Navigate based on user type
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _userType == 'stationOwner'
+                    ? 'Station owner account created successfully!'
+                    : 'Account created successfully!',
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+
+          // Step 7: Navigate based on user type
+          // Wait a moment for the success message to be visible
+          await Future.delayed(const Duration(seconds: 1));
+
           if (_userType == 'stationOwner') {
             Navigator.pushReplacementNamed(context, '/station-dashboard');
           } else {
@@ -127,27 +166,82 @@ class _SignUpScreenState extends State<SignUpScreen> {
       } on FirebaseAuthException catch (e) {
         String errorMessage = 'An error occurred';
 
+        print('FirebaseAuthException: ${e.code} - ${e.message}');
+
         if (e.code == 'weak-password') {
-          errorMessage = 'The password provided is too weak';
+          errorMessage = 'The password provided is too weak. Use at least 6 characters.';
         } else if (e.code == 'email-already-in-use') {
-          errorMessage = 'An account already exists for this email';
+          errorMessage = 'An account already exists for this email. Please sign in instead.';
         } else if (e.code == 'invalid-email') {
-          errorMessage = 'Invalid email address';
+          errorMessage = 'Invalid email address format.';
         } else if (e.code == 'operation-not-allowed') {
-          errorMessage = 'Email/password accounts are not enabled';
+          errorMessage = 'Email/password accounts are not enabled. Contact support.';
+        } else if (e.code == 'network-request-failed') {
+          errorMessage = 'Network error. Please check your internet connection.';
+        } else {
+          errorMessage = 'Authentication failed: ${e.message}';
+        }
+
+        // If user was created but Firestore write failed, delete the auth user
+        if (userCredential != null && e.code != 'email-already-in-use') {
+          try {
+            await userCredential.user?.delete();
+            print('Rolled back user creation due to error');
+          } catch (deleteError) {
+            print('Failed to rollback user creation: $deleteError');
+          }
         }
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      } on FirebaseException catch (e) {
+        print('FirebaseException: ${e.code} - ${e.message}');
+        
+        // Rollback: Delete the auth user if Firestore operation failed
+        if (userCredential != null) {
+          try {
+            await userCredential.user?.delete();
+            print('Rolled back user creation due to Firestore error');
+          } catch (deleteError) {
+            print('Failed to rollback user creation: $deleteError');
+          }
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Database error: ${e.message ?? "Please try again"}'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+            ),
           );
         }
       } catch (e) {
+        print('Unexpected error: $e');
+        
+        // Rollback: Delete the auth user if any unexpected error occurred
+        if (userCredential != null) {
+          try {
+            await userCredential.user?.delete();
+            print('Rolled back user creation due to unexpected error');
+          } catch (deleteError) {
+            print('Failed to rollback user creation: $deleteError');
+          }
+        }
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Failed to create account. Please try again.'),
               backgroundColor: Colors.red,
+              duration: Duration(seconds: 4),
             ),
           );
         }
@@ -278,7 +372,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             if (value == null || value.isEmpty) {
                               return 'Please enter your full name';
                             }
-                            if (value.length < 3) {
+                            if (value.trim().length < 3) {
                               return 'Name must be at least 3 characters';
                             }
                             return null;
@@ -323,6 +417,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               if (value == null || value.isEmpty) {
                                 return 'Please enter your business name';
                               }
+                              if (value.trim().length < 3) {
+                                return 'Business name must be at least 3 characters';
+                              }
                               return null;
                             },
                           ),
@@ -363,6 +460,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             validator: (value) {
                               if (value == null || value.isEmpty) {
                                 return 'Please enter your station address';
+                              }
+                              if (value.trim().length < 10) {
+                                return 'Please enter a complete address';
                               }
                               return null;
                             },
@@ -407,10 +507,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             if (value == null || value.isEmpty) {
                               return 'Please enter your email';
                             }
-                            if (!RegExp(
-                              r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                            ).hasMatch(value)) {
-                              return 'Please enter a valid email';
+                            final emailRegex = RegExp(
+                              r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+                            );
+                            if (!emailRegex.hasMatch(value.trim())) {
+                              return 'Please enter a valid email address';
                             }
                             return null;
                           },
@@ -454,8 +555,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             if (value == null || value.isEmpty) {
                               return 'Please enter your phone number';
                             }
-                            if (value.length < 10) {
-                              return 'Please enter a valid phone number';
+                            // Remove spaces and special characters for validation
+                            final digitsOnly = value.replaceAll(RegExp(r'[^\d]'), '');
+                            if (digitsOnly.length < 10) {
+                              return 'Please enter a valid phone number (at least 10 digits)';
                             }
                             return null;
                           },
@@ -514,6 +617,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             }
                             if (value.length < 6) {
                               return 'Password must be at least 6 characters';
+                            }
+                            // Optional: Add stronger password requirements
+                            if (!value.contains(RegExp(r'[A-Z]'))) {
+                              return 'Password must contain at least one uppercase letter';
+                            }
+                            if (!value.contains(RegExp(r'[0-9]'))) {
+                              return 'Password must contain at least one number';
                             }
                             return null;
                           },
@@ -643,24 +753,24 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               elevation: 0,
+                              disabledBackgroundColor: Colors.grey.shade400,
                             ),
-                            child:
-                                _isLoading
-                                    ? const SizedBox(
-                                      height: 24,
-                                      width: 24,
-                                      child: CircularProgressIndicator(
-                                        color: Colors.white,
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                    : const Text(
-                                      'Sign Up',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    height: 24,
+                                    width: 24,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
                                     ),
+                                  )
+                                : const Text(
+                                    'Sign Up',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                           ),
                         ),
                       ],

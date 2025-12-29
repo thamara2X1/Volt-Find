@@ -13,11 +13,13 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _rememberMe = false;
 
   @override
   void dispose() {
@@ -33,65 +35,99 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       try {
-        // Sign in with email and password
+        print('Attempting login...');
+        
+        // Step 1: Sign in with email and password
         UserCredential userCredential = await _auth.signInWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
 
-        // Get user data from Firestore to check user type
-        DocumentSnapshot userDoc =
-            await _firestore
-                .collection('users')
-                .doc(userCredential.user?.uid)
-                .get();
+        print('Login successful: ${userCredential.user?.uid}');
+
+        // Step 2: Fetch user data from Firestore to determine user type
+        final userDoc = await _firestore
+            .collection('users')
+            .doc(userCredential.user?.uid)
+            .get();
+
+        if (!userDoc.exists) {
+          // User authenticated but no Firestore document
+          print('User document not found in Firestore');
+          throw Exception('User profile not found. Please contact support.');
+        }
+
+        final userData = userDoc.data();
+        final userType = userData?['userType'] ?? 'customer';
+        final isActive = userData?['isActive'] ?? true;
+
+        print('User type: $userType, Active: $isActive');
+
+        // Check if user is active
+        if (!isActive) {
+          await _auth.signOut();
+          throw Exception('Your account has been deactivated. Please contact support.');
+        }
 
         if (mounted) {
-          if (userDoc.exists) {
-            // Get the user type
-            String userType =
-                userDoc.data() != null
-                    ? (userDoc.data() as Map<String, dynamic>)['userType'] ??
-                        'customer'
-                    : 'customer';
-
-            // Navigate based on user type
-            if (userType == 'stationOwner') {
-              Navigator.pushReplacementNamed(context, '/station-dashboard');
-            } else {
-              Navigator.pushReplacementNamed(context, '/home');
-            }
+          // Step 3: Navigate based on user type
+          if (userType == 'stationOwner') {
+            print('Navigating to station dashboard...');
+            Navigator.pushReplacementNamed(context, '/station-dashboard');
           } else {
-            // If user document doesn't exist, default to customer home
+            print('Navigating to home screen...');
             Navigator.pushReplacementNamed(context, '/home');
           }
         }
       } on FirebaseAuthException catch (e) {
+        print('FirebaseAuthException: ${e.code} - ${e.message}');
+        
         String errorMessage = 'An error occurred';
 
-        if (e.code == 'user-not-found') {
-          errorMessage = 'No user found with this email';
-        } else if (e.code == 'wrong-password') {
-          errorMessage = 'Incorrect password';
-        } else if (e.code == 'invalid-email') {
-          errorMessage = 'Invalid email address';
-        } else if (e.code == 'user-disabled') {
-          errorMessage = 'This account has been disabled';
-        } else if (e.code == 'invalid-credential') {
-          errorMessage = 'Invalid email or password';
+        switch (e.code) {
+          case 'user-not-found':
+            errorMessage = 'No account found with this email address.';
+            break;
+          case 'wrong-password':
+            errorMessage = 'Incorrect password. Please try again.';
+            break;
+          case 'invalid-email':
+            errorMessage = 'Invalid email address format.';
+            break;
+          case 'user-disabled':
+            errorMessage = 'This account has been disabled. Contact support.';
+            break;
+          case 'too-many-requests':
+            errorMessage = 'Too many failed attempts. Please try again later.';
+            break;
+          case 'network-request-failed':
+            errorMessage = 'Network error. Check your internet connection.';
+            break;
+          case 'invalid-credential':
+            errorMessage = 'Invalid credentials. Please check your email and password.';
+            break;
+          default:
+            errorMessage = 'Login failed: ${e.message}';
         }
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+            ),
           );
         }
       } catch (e) {
+        print('Unexpected error: $e');
+        
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to sign in. Please try again.'),
+            SnackBar(
+              content: Text(e.toString().replaceFirst('Exception: ', '')),
               backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
             ),
           );
         }
@@ -109,38 +145,8 @@ class _LoginScreenState extends State<LoginScreen> {
     Navigator.pushNamed(context, '/user-type-selection');
   }
 
-  void _handleForgotPassword() async {
-    if (_emailController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter your email address first'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    try {
-      await _auth.sendPasswordResetEmail(email: _emailController.text.trim());
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Password reset email sent! Check your inbox.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+  void _navigateToForgotPassword() {
+    Navigator.pushNamed(context, '/forgot-password');
   }
 
   @override
@@ -149,9 +155,6 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           child: Container(
-            height:
-                MediaQuery.of(context).size.height -
-                MediaQuery.of(context).padding.top,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -164,7 +167,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 60),
 
                   // Logo and Title
                   Row(
@@ -202,7 +205,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
                   ),
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 40),
 
                   // Login Form
                   Form(
@@ -246,10 +249,11 @@ class _LoginScreenState extends State<LoginScreen> {
                             if (value == null || value.isEmpty) {
                               return 'Please enter your email';
                             }
-                            if (!RegExp(
-                              r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                            ).hasMatch(value)) {
-                              return 'Please enter a valid email';
+                            final emailRegex = RegExp(
+                              r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+                            );
+                            if (!emailRegex.hasMatch(value.trim())) {
+                              return 'Please enter a valid email address';
                             }
                             return null;
                           },
@@ -306,27 +310,47 @@ class _LoginScreenState extends State<LoginScreen> {
                             if (value == null || value.isEmpty) {
                               return 'Please enter your password';
                             }
-                            if (value.length < 6) {
-                              return 'Password must be at least 6 characters';
-                            }
                             return null;
                           },
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 12),
 
-                        // Forgot Password
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: _handleForgotPassword,
-                            child: Text(
-                              'Forgot Password?',
-                              style: TextStyle(
-                                color: Colors.green.shade700,
-                                fontWeight: FontWeight.w600,
+                        // Remember Me & Forgot Password
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Checkbox(
+                                  value: _rememberMe,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _rememberMe = value ?? false;
+                                    });
+                                  },
+                                  activeColor: Colors.green.shade600,
+                                ),
+                                Text(
+                                  'Remember me',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            TextButton(
+                              onPressed: _navigateToForgotPassword,
+                              child: Text(
+                                'Forgot Password?',
+                                style: TextStyle(
+                                  color: Colors.green.shade700,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ),
                         const SizedBox(height: 24),
 
@@ -343,24 +367,24 @@ class _LoginScreenState extends State<LoginScreen> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               elevation: 0,
+                              disabledBackgroundColor: Colors.grey.shade400,
                             ),
-                            child:
-                                _isLoading
-                                    ? const SizedBox(
-                                      height: 24,
-                                      width: 24,
-                                      child: CircularProgressIndicator(
-                                        color: Colors.white,
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                    : const Text(
-                                      'Sign In',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    height: 24,
+                                    width: 24,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
                                     ),
+                                  )
+                                : const Text(
+                                    'Sign In',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                           ),
                         ),
                       ],
@@ -389,11 +413,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 24),
 
-                  // Social Sign In Buttons
+                  // Social Login Buttons
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Google Sign In
+                      // Google Login
                       Container(
                         height: 56,
                         width: 56,
@@ -421,7 +445,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(width: 16),
-                      // Apple Sign In
+                      // Apple Login
                       Container(
                         height: 56,
                         width: 56,
@@ -448,7 +472,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
 
-                  const Spacer(),
+                  const SizedBox(height: 32),
 
                   // Sign Up Link
                   Row(
