@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:provider/provider.dart';
-import 'package:volt_find/domain/entities/user.dart';
-import 'package:volt_find/presentation/providers/user_provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:volt_find/widgets/custom_bottom_nav_bar.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -12,6 +12,9 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  
   late Future<SharedPreferences> _prefsFuture;
   bool _notificationsEnabled = true;
   bool _darkModeEnabled = false;
@@ -26,9 +29,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _language = 'English';
   String _currency = 'Rs. (LKR)';
 
+  Map<String, dynamic>? _userData;
+  bool _isLoadingUser = true;
+
   final List<String> _mapStyles = ['Standard', 'Satellite', 'Terrain', 'Night'];
   final List<String> _searchRadii = ['5 km', '10 km', '15 km', '20 km', '30 km'];
-  final List<String> _languages = ['English', 'සිංහල', 'தமிழ்'];
+  final List<String> _languages = ['English', 'සිංහල', 'தමிழ්'];
   final List<String> _currencies = ['Rs. (LKR)', '\$ (USD)', '€ (EUR)', '£ (GBP)'];
 
   @override
@@ -36,6 +42,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _prefsFuture = SharedPreferences.getInstance();
     _loadSettings();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    setState(() {
+      _isLoadingUser = true;
+    });
+
+    try {
+      final user = _auth.currentUser;
+      
+      if (user != null) {
+        final userDoc = await _firestore
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (userDoc.exists) {
+          setState(() {
+            _userData = userDoc.data();
+            _isLoadingUser = false;
+          });
+        } else {
+          setState(() {
+            _isLoadingUser = false;
+          });
+        }
+      } else {
+        setState(() {
+          _isLoadingUser = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading user data: $e');
+      setState(() {
+        _isLoadingUser = false;
+      });
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -262,9 +306,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final userProvider = context.watch<UserProvider>();
-    final user = userProvider.user;
-
     return FutureBuilder<SharedPreferences>(
       future: _prefsFuture,
       builder: (context, snapshot) {
@@ -325,15 +366,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
+            // Add bottom nav bar even on error screen
+            bottomNavigationBar: const CustomBottomNavBar(currentIndex: 3),
           );
         }
 
-        return _buildSettingsScreen(user);
+        return _buildSettingsScreen();
       },
     );
   }
 
-  Widget _buildSettingsScreen(User? user) {
+  Widget _buildSettingsScreen() {
+    final user = _auth.currentUser;
+    
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
@@ -360,7 +405,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // User Info Card
-            if (user != null)
+            if (user != null && !_isLoadingUser)
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -378,22 +423,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     CircleAvatar(
                       radius: 30,
-                      backgroundColor: Colors.grey.shade200,
-                      child: user.photoUrl != null
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(30),
-                              child: Image.network(
-                                user.photoUrl!,
-                                width: 60,
-                                height: 60,
-                                fit: BoxFit.cover,
-                              ),
-                            )
-                          : Icon(
+                      backgroundColor: Colors.green.shade100,
+                      backgroundImage: _userData?['photoUrl'] != null
+                          ? NetworkImage(_userData!['photoUrl'])
+                          : null,
+                      child: _userData?['photoUrl'] == null
+                          ? Icon(
                               Icons.person,
                               size: 30,
-                              color: Colors.grey.shade600,
-                            ),
+                              color: Colors.green.shade600,
+                            )
+                          : null,
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -401,7 +441,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            user.name ?? 'User',
+                            _userData?['name'] ?? user.displayName ?? 'User',
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -409,20 +449,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            user.email,
+                            _userData?['email'] ?? user.email ?? '',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey.shade600,
                             ),
                           ),
-                          if (user.vehicleModel != null)
-                            Text(
-                              'Vehicle: ${user.vehicleModel}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade500,
-                              ),
-                            ),
                         ],
                       ),
                     ),
@@ -656,7 +688,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(context),
-                            child: Text('Close'),
+                            child: const Text('Close'),
                           ),
                         ],
                       ),
@@ -690,7 +722,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(context),
-                            child: Text('Close'),
+                            child: const Text('Close'),
                           ),
                         ],
                       ),
@@ -743,10 +775,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 80), // Space for bottom nav
           ],
         ),
       ),
+      // Add custom bottom navigation bar
+      bottomNavigationBar: const CustomBottomNavBar(currentIndex: 3), // Settings is index 3
     );
   }
 
