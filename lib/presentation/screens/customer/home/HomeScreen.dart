@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:volt_find/widgets/custom_bottom_nav_bar.dart';
 import 'dart:math' show cos, sqrt, asin;
 
 class HomeScreen extends StatefulWidget {
@@ -24,6 +26,16 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _currentUser = _auth.currentUser;
     _getCurrentLocation();
+    
+    // Make status bar transparent
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light, // Light icons on green background
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+    );
   }
 
   Future<void> _getCurrentLocation() async {
@@ -154,273 +166,171 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            // App Bar
-            SliverAppBar(
-              floating: true,
-              backgroundColor: Colors.green.shade600,
-              elevation: 0,
-              title: Row(
-                children: [
-                  Icon(Icons.electric_bolt, color: Colors.white),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'VoltFind',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+      // Remove SafeArea for full screen
+      body: CustomScrollView(
+        slivers: [
+          // App Bar - extends under status bar
+          SliverAppBar(
+            floating: true,
+            expandedHeight: 0,
+            backgroundColor: Colors.green.shade600,
+            elevation: 0,
+            // Add padding for status bar
+            flexibleSpace: Padding(
+              padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
+              child: Container(
+                color: Colors.green.shade600,
+                child: Row(
+                  children: [
+                    const SizedBox(width: 16),
+                    Icon(Icons.electric_bolt, color: Colors.white),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'VoltFind',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                    IconButton(
+                      icon: const Icon(Icons.notifications_outlined,
+                          color: Colors.white),
+                      onPressed: () {
+                        // Handle notifications
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.logout, color: Colors.white),
+                      onPressed: _handleLogout,
+                    ),
+                  ],
+                ),
               ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.notifications_outlined,
-                      color: Colors.white),
-                  onPressed: () {
-                    // Handle notifications
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.logout, color: Colors.white),
-                  onPressed: _handleLogout,
-                ),
-              ],
             ),
+          ),
 
-            // Main Content
-            SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Welcome Section
-                  Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade600,
-                      borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(30),
-                        bottomRight: Radius.circular(30),
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Welcome back,',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.white.withOpacity(0.9),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _currentUser?.displayName ?? 'User',
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-
-                          // Search Bar
-                          GestureDetector(
-                            onTap: _navigateToSearch,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 20, vertical: 16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.search,
-                                      color: Colors.grey.shade600),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    'Search charging stations...',
-                                    style: TextStyle(
-                                      color: Colors.grey.shade600,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+          // Main Content
+          SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Welcome Section
+                Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade600,
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(30),
+                      bottomRight: Radius.circular(30),
                     ),
                   ),
-
-                  const SizedBox(height: 24),
-
-                  // Quick Actions
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Quick Actions',
+                        Text(
+                          'Welcome back,',
                           style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Colors.white.withOpacity(0.9),
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildQuickActionCard(
-                                icon: Icons.map_outlined,
-                                title: 'View Map',
-                                color: Colors.blue,
-                                onTap: _navigateToViewMap,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildQuickActionCard(
-                                icon: Icons.person_outline,
-                                title: 'Profile',
-                                color: Colors.purple,
-                                onTap: _navigateToProfile,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildQuickActionCard(
-                                icon: Icons.settings_outlined,
-                                title: 'Settings',
-                                color: Colors.orange,
-                                onTap: _navigateToSettings,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildQuickActionCard(
-                                icon: Icons.article_outlined,
-                                title: 'EV News',
-                                color: Colors.green,
-                                onTap: _navigateToEVNews,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  // Nearby Stations Header
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Nearby Stations',
-                          style: TextStyle(
-                            fontSize: 20,
+                        const SizedBox(height: 4),
+                        Text(
+                          _currentUser?.displayName ?? 'User',
+                          style: const TextStyle(
+                            fontSize: 24,
                             fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
                         ),
-                        TextButton(
-                          onPressed: _navigateToSearch,
-                          child: Text(
-                            'See All',
-                            style: TextStyle(
-                              color: Colors.green.shade600,
-                              fontWeight: FontWeight.w600,
+                        const SizedBox(height: 24),
+
+                        // Search Bar
+                        GestureDetector(
+                          onTap: _navigateToSearch,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.search,
+                                    color: Colors.grey.shade600),
+                                const SizedBox(width: 12),
+                                Text(
+                                  'Search charging stations...',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade600,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
                       ],
                     ),
                   ),
+                ),
 
-                  const SizedBox(height: 12),
+                const SizedBox(height: 24),
 
-                  // Real-time Station Cards List
-                  _buildRealTimeStationsList(),
+                // Nearby Stations Header
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Nearby Stations',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _navigateToSearch,
+                        child: Text(
+                          'See All',
+                          style: TextStyle(
+                            color: Colors.green.shade600,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
 
-                  const SizedBox(height: 24),
-                ],
-              ),
+                const SizedBox(height: 12),
+
+                // Real-time Station Cards List
+                _buildRealTimeStationsList(),
+
+                // Add padding at bottom for bottom navigation bar
+                const SizedBox(height: 80), // Fixed height for bottom nav
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildQuickActionCard({
-    required IconData icon,
-    required String title,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                size: 28,
-                color: color,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
+      // Add custom bottom navigation bar
+      bottomNavigationBar: const CustomBottomNavBar(currentIndex: 0), // Home is index 0
     );
   }
 
