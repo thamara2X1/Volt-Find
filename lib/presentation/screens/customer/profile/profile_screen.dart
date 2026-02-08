@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:volt_find/presentation/providers/user_provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:volt_find/widgets/custom_bottom_nav_bar.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({Key? key}) : super(key: key);
@@ -11,19 +12,74 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  
   late TextEditingController _nameController;
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
 
+  bool _isLoading = true;
+  bool _isSaving = false;
+  Map<String, dynamic>? _userData;
+
   @override
   void initState() {
     super.initState();
-    final userProvider = context.read<UserProvider>();
-    final user = userProvider.user;
-    
-    _nameController = TextEditingController(text: user?.name ?? '');
-    _emailController = TextEditingController(text: user?.email ?? '');
-    _phoneController = TextEditingController(text: user?.phone ?? '');
+    _nameController = TextEditingController();
+    _emailController = TextEditingController();
+    _phoneController = TextEditingController();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final user = _auth.currentUser;
+      
+      if (user != null) {
+        // Get user data from Firestore
+        final userDoc = await _firestore
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (userDoc.exists) {
+          _userData = userDoc.data();
+          
+          // Populate controllers with data
+          _nameController.text = _userData?['name'] ?? user.displayName ?? '';
+          _emailController.text = _userData?['email'] ?? user.email ?? '';
+          _phoneController.text = _userData?['phone'] ?? '';
+          
+          print('User data loaded: ${_userData?['name']}');
+        } else {
+          print('User document does not exist in Firestore');
+          // Use Firebase Auth data as fallback
+          _nameController.text = user.displayName ?? '';
+          _emailController.text = user.email ?? '';
+        }
+      }
+    } catch (e) {
+      print('Error loading user data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load profile: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -36,22 +92,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> _updateProfile() async {
     if (_formKey.currentState!.validate()) {
-      final userProvider = context.read<UserProvider>();
-      final user = userProvider.user;
+      setState(() {
+        _isSaving = true;
+      });
 
-      if (user != null) {
-        try {
-          // Update name
-          if (_nameController.text != user.name) {
-            await userProvider.updateName(_nameController.text);
-          }
+      try {
+        final user = _auth.currentUser;
+        
+        if (user != null) {
+          // Update Firestore
+          await _firestore.collection('users').doc(user.uid).update({
+            'name': _nameController.text.trim(),
+            'phone': _phoneController.text.trim(),
+            'lastUpdated': FieldValue.serverTimestamp(),
+          });
 
-          // Update phone
-          if (_phoneController.text != user.phone) {
-            await userProvider.updatePhone(_phoneController.text);
-          }
+          // Update Firebase Auth display name
+          await user.updateDisplayName(_nameController.text.trim());
+          
+          print('Profile updated successfully');
 
-          // Show success message
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -61,17 +121,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             );
             
             // Navigate back
-            Navigator.pop(context);
+            Navigator.pop(context, true); // Return true to indicate success
           }
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Failed to update profile: $e'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
+        }
+      } catch (e) {
+        print('Error updating profile: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update profile: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isSaving = false;
+          });
         }
       }
     }
@@ -79,8 +146,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final userProvider = context.watch<UserProvider>();
-
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
@@ -88,13 +153,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         title: const Text('Edit Profile'),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.check),
-            onPressed: _updateProfile,
-          ),
+          if (!_isLoading)
+            IconButton(
+              icon: const Icon(Icons.check),
+              onPressed: _isSaving ? null : _updateProfile,
+            ),
         ],
       ),
-      body: userProvider.isLoading
+      body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: const EdgeInsets.all(24),
@@ -107,17 +173,27 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     Center(
                       child: GestureDetector(
                         onTap: () {
-                          // Handle photo update
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Photo upload - Coming soon!'),
+                            ),
+                          );
                         },
                         child: Stack(
                           children: [
                             CircleAvatar(
                               radius: 60,
-                              backgroundImage: userProvider.user?.photoUrl != null
-                                  ? NetworkImage(userProvider.user!.photoUrl!)
-                                  : const AssetImage('assets/default_avatar.png')
-                                      as ImageProvider,
-                              backgroundColor: Colors.white,
+                              backgroundImage: _userData?['photoUrl'] != null
+                                  ? NetworkImage(_userData!['photoUrl'])
+                                  : null,
+                              backgroundColor: Colors.green.shade100,
+                              child: _userData?['photoUrl'] == null
+                                  ? Icon(
+                                      Icons.person,
+                                      size: 60,
+                                      color: Colors.green.shade600,
+                                    )
+                                  : null,
                             ),
                             Positioned(
                               bottom: 0,
@@ -125,7 +201,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               child: Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: Colors.green.shade800,
+                                  color: Colors.green.shade600,
                                   shape: BoxShape.circle,
                                   border: Border.all(color: Colors.white, width: 2),
                                 ),
@@ -156,11 +232,34 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       controller: _nameController,
                       decoration: InputDecoration(
                         hintText: 'Enter your full name',
-                        prefixIcon: const Icon(Icons.person_outline),
+                        prefixIcon: Icon(
+                          Icons.person_outline,
+                          color: Colors.green.shade600,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: Colors.green.shade600,
+                            width: 2,
+                          ),
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please enter your name';
+                        }
+                        if (value.trim().length < 3) {
+                          return 'Name must be at least 3 characters';
                         }
                         return null;
                       },
@@ -183,7 +282,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       enabled: false,
                       decoration: InputDecoration(
                         hintText: 'Email address',
-                        prefixIcon: const Icon(Icons.email_outlined),
+                        prefixIcon: Icon(
+                          Icons.email_outlined,
+                          color: Colors.grey.shade400,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        disabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
                         filled: true,
                         fillColor: Colors.grey.shade100,
                       ),
@@ -204,14 +318,35 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       controller: _phoneController,
                       decoration: InputDecoration(
                         hintText: 'Enter your phone number',
-                        prefixIcon: const Icon(Icons.phone_outlined),
+                        prefixIcon: Icon(
+                          Icons.phone_outlined,
+                          color: Colors.green.shade600,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: Colors.green.shade600,
+                            width: 2,
+                          ),
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
                       ),
                       keyboardType: TextInputType.phone,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please enter your phone number';
                         }
-                        if (value.length < 10) {
+                        final digitsOnly = value.replaceAll(RegExp(r'[^\d]'), '');
+                        if (digitsOnly.length < 10) {
                           return 'Please enter a valid phone number';
                         }
                         return null;
@@ -219,11 +354,57 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                     const SizedBox(height: 32),
 
+                    // User Type Badge (if available)
+                    if (_userData?['userType'] != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.blue.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _userData!['userType'] == 'stationOwner'
+                                  ? Icons.business
+                                  : Icons.person,
+                              color: Colors.blue.shade700,
+                            ),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Account Type',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                                Text(
+                                  _userData!['userType'] == 'stationOwner'
+                                      ? 'Station Owner'
+                                      : 'Customer',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.blue.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                    ],
+
                     // Update Button
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: _updateProfile,
+                        onPressed: _isSaving ? null : _updateProfile,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green.shade600,
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -231,7 +412,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: userProvider.isLoading
+                        child: _isSaving
                             ? const SizedBox(
                                 height: 24,
                                 width: 24,
@@ -253,6 +434,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
               ),
             ),
+      // Add custom bottom navigation bar
+      bottomNavigationBar: const CustomBottomNavBar(currentIndex: 2), // Profile is index 2
     );
   }
 }
