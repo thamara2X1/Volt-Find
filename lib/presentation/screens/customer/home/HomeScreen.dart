@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:volt_find/widgets/custom_bottom_nav_bar.dart';
 import 'dart:math' show cos, sqrt, asin;
 
 class HomeScreen extends StatefulWidget {
@@ -289,69 +290,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 const SizedBox(height: 24),
 
-                // Quick Actions
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Quick Actions',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildQuickActionCard(
-                              icon: Icons.map_outlined,
-                              title: 'View Map',
-                              color: Colors.blue,
-                              onTap: _navigateToViewMap,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildQuickActionCard(
-                              icon: Icons.person_outline,
-                              title: 'Profile',
-                              color: Colors.purple,
-                              onTap: _navigateToProfile,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildQuickActionCard(
-                              icon: Icons.settings_outlined,
-                              title: 'Settings',
-                              color: Colors.orange,
-                              onTap: _navigateToSettings,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildQuickActionCard(
-                              icon: Icons.article_outlined,
-                              title: 'EV News',
-                              color: Colors.green,
-                              onTap: _navigateToEVNews,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 32),
-
                 // Nearby Stations Header
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -384,63 +322,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 // Real-time Station Cards List
                 _buildRealTimeStationsList(),
 
-                // Add padding at bottom for navigation bar
-                SizedBox(height: MediaQuery.of(context).padding.bottom + 24),
+                // Add padding at bottom for bottom navigation bar
+                const SizedBox(height: 80), // Fixed height for bottom nav
               ],
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildQuickActionCard({
-    required IconData icon,
-    required String title,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                size: 28,
-                color: color,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
+      // Add custom bottom navigation bar
+      bottomNavigationBar: const CustomBottomNavBar(currentIndex: 0), // Home is index 0
     );
   }
 
