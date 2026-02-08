@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:volt_find/widgets/custom_bottom_nav_bar.dart';
 
 class ViewMapScreen extends StatefulWidget {
   const ViewMapScreen({Key? key}) : super(key: key);
@@ -458,6 +459,11 @@ class _ViewMapScreenState extends State<ViewMapScreen> {
     );
   }
 
+  void _navigateToHome() {
+    // Navigate to Home screen, replacing current route
+    Navigator.pushReplacementNamed(context, '/home');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -571,7 +577,7 @@ class _ViewMapScreenState extends State<ViewMapScreen> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.arrow_back),
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: _navigateToHome, // Navigate to Home
                   ),
                   Expanded(
                     child: GestureDetector(
@@ -602,7 +608,7 @@ class _ViewMapScreenState extends State<ViewMapScreen> {
           // Floating Action Buttons
           Positioned(
             right: 16,
-            bottom: 100,
+            bottom: 180, // Adjusted for bottom nav bar
             child: Column(
               children: [
                 FloatingActionButton(
@@ -626,7 +632,7 @@ class _ViewMapScreenState extends State<ViewMapScreen> {
 
           // Station Count Badge
           Positioned(
-            bottom: 24,
+            bottom: 100, // Adjusted for bottom nav bar
             left: 0,
             right: 0,
             child: Center(
@@ -662,6 +668,8 @@ class _ViewMapScreenState extends State<ViewMapScreen> {
           ),
         ],
       ),
+      // Add custom bottom navigation bar
+      bottomNavigationBar: const CustomBottomNavBar(currentIndex: 1), // Map is index 1
     );
   }
 }
