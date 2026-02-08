@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -25,6 +26,8 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    _loadRememberedCredentials();
+    
     // Make status bar transparent
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
@@ -34,6 +37,50 @@ class _LoginScreenState extends State<LoginScreen> {
         systemNavigationBarIconBrightness: Brightness.dark,
       ),
     );
+  }
+
+  // Load remembered credentials from SharedPreferences
+  Future<void> _loadRememberedCredentials() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rememberMe = prefs.getBool('remember_me') ?? false;
+      
+      if (rememberMe) {
+        final email = prefs.getString('user_email') ?? '';
+        final password = prefs.getString('user_password') ?? '';
+        
+        setState(() {
+          _rememberMe = rememberMe;
+          _emailController.text = email;
+          _passwordController.text = password;
+        });
+        
+        print('Loaded remembered credentials for: $email');
+      }
+    } catch (e) {
+      print('Error loading credentials: $e');
+    }
+  }
+
+  // Save credentials to SharedPreferences
+  Future<void> _saveCredentials() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      if (_rememberMe) {
+        await prefs.setBool('remember_me', true);
+        await prefs.setString('user_email', _emailController.text.trim());
+        await prefs.setString('user_password', _passwordController.text.trim());
+        print('Credentials saved');
+      } else {
+        await prefs.setBool('remember_me', false);
+        await prefs.remove('user_email');
+        await prefs.remove('user_password');
+        print('Credentials cleared');
+      }
+    } catch (e) {
+      print('Error saving credentials: $e');
+    }
   }
 
   @override
@@ -59,6 +106,9 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         print('Login successful: ${userCredential.user?.uid}');
+
+        // Save credentials if Remember Me is checked
+        await _saveCredentials();
 
         // Step 2: Fetch user data from Firestore to determine user type
         final userDoc = await _firestore
