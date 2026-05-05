@@ -28,6 +28,7 @@ import 'firebase_options.dart';
 
 // Providers
 import 'presentation/providers/user_provider.dart';
+import 'presentation/providers/app_theme_provider.dart';
 
 // Domain layer use cases
 import 'domain/usecases/user/get_user_usecase.dart';
@@ -36,16 +37,13 @@ import 'domain/usecases/user/update_user_usecase.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Initialize Firebase instances
   final firestore = FirebaseFirestore.instance;
   final auth = firebase_auth.FirebaseAuth.instance;
 
-  // Initialize User dependencies for Clean Architecture
   final userRepository = UserRepositoryImpl(firestore, auth);
   final getUserUseCase = GetUserUseCase(userRepository);
   final updateUserUseCase = UpdateUserUseCase(userRepository);
@@ -53,6 +51,10 @@ void main() async {
   runApp(
     MultiProvider(
       providers: [
+        // Theme Provider — must be first so MaterialApp can consume it
+        ChangeNotifierProvider(
+          create: (_) => AppThemeProvider(),
+        ),
         // User Provider
         ChangeNotifierProvider(
           create: (_) => UserProvider(
@@ -61,9 +63,6 @@ void main() async {
             auth: auth,
           ),
         ),
-        // Add other providers here as you create them:
-        // ChangeNotifierProvider(create: (_) => StationProvider()),
-        // ChangeNotifierProvider(create: (_) => AuthProvider()),
       ],
       child: const MyApp(),
     ),
@@ -73,65 +72,132 @@ void main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  // ─── Light Theme ────────────────────────────────────────────────────────────
+  static ThemeData _lightTheme() {
+    return ThemeData(
+      brightness: Brightness.light,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: Colors.green,
+        brightness: Brightness.light,
+        primary: Colors.green.shade600,
+        secondary: Colors.blue.shade600,
+      ),
+      scaffoldBackgroundColor: Colors.grey.shade50,
+      appBarTheme: AppBarTheme(
+        backgroundColor: Colors.green.shade600,
+        elevation: 0,
+        foregroundColor: Colors.white,
+        titleTextStyle: const TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.green.shade600,
+          foregroundColor: Colors.white,
+          minimumSize: const Size(double.infinity, 56),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          textStyle: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.green.shade600, width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      ),
+      cardColor: Colors.white,
+      useMaterial3: true,
+    );
+  }
+
+  // ─── Dark Theme ─────────────────────────────────────────────────────────────
+  static ThemeData _darkTheme() {
+    return ThemeData(
+      brightness: Brightness.dark,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: Colors.green,
+        brightness: Brightness.dark,
+        primary: Colors.green.shade400,
+        secondary: Colors.blue.shade300,
+        surface: const Color(0xFF1E1E1E),
+        background: const Color(0xFF121212),
+      ),
+      scaffoldBackgroundColor: const Color(0xFF121212),
+      appBarTheme: AppBarTheme(
+        backgroundColor: const Color(0xFF1A1A1A),
+        elevation: 0,
+        foregroundColor: Colors.white,
+        titleTextStyle: const TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.green.shade500,
+          foregroundColor: Colors.white,
+          minimumSize: const Size(double.infinity, 56),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          textStyle: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: const Color(0xFF2C2C2C),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF3D3D3D)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF3D3D3D)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.green.shade400, width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      ),
+      cardColor: const Color(0xFF1E1E1E),
+      useMaterial3: true,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final themeProvider = context.watch<AppThemeProvider>();
+
     return MaterialApp(
       title: 'VoltFind EV Charging',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.green,
-          primary: Colors.green.shade600,
-          secondary: Colors.blue.shade600,
-        ),
-        scaffoldBackgroundColor: Colors.grey.shade50,
-        appBarTheme: AppBarTheme(
-          backgroundColor: Colors.green.shade600,
-          elevation: 0,
-          foregroundColor: Colors.white,
-          titleTextStyle: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green.shade600,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(double.infinity, 56),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            textStyle: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade300),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade300),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.green.shade600, width: 2),
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 16,
-          ),
-        ),
-        useMaterial3: true,
-      ),
-      // ✅ CRITICAL: Use AuthWrapper instead of fixed initialRoute
+      theme: _lightTheme(),
+      darkTheme: _darkTheme(),
+      themeMode: themeProvider.themeMode,
       home: const AuthWrapper(),
       routes: {
         // Auth Routes
@@ -139,7 +205,7 @@ class MyApp extends StatelessWidget {
         '/user-type-selection': (context) => const UserTypeSelectionScreen(),
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignUpScreen(),
-        
+
         // Customer Routes
         '/home': (context) => const HomeScreen(),
         '/view-map': (context) => const ViewMapScreen(),
@@ -148,16 +214,14 @@ class MyApp extends StatelessWidget {
         '/station-details': (context) => const StationDetailsScreen(),
         '/book-now': (context) => const BookNowScreen(),
         '/booking-confirmation': (context) => const BookingConfirmationScreen(),
-        '/settings': (context) => SettingsScreen(),
+        '/settings': (context) => const SettingsScreen(),
         '/booking-history': (context) => BookingHistoryScreen(),
-        
+
         // Station Owner Routes
         '/station-dashboard': (context) => const StationDashboardScreen(),
         '/update-availability': (context) => const UpdateAvailabilityScreen(),
         '/edit-station': (context) => const EditStationScreen(),
       },
-
-      // Handle undefined routes
       onUnknownRoute: (settings) {
         return MaterialPageRoute(
           builder: (context) => const OnboardingScreen(),
@@ -176,23 +240,17 @@ class AuthWrapper extends StatelessWidget {
     return StreamBuilder<firebase_auth.User?>(
       stream: firebase_auth.FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // Show loading while checking auth state
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(
             body: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(
-                    color: Colors.green.shade600,
-                  ),
+                  CircularProgressIndicator(color: Colors.green.shade600),
                   const SizedBox(height: 16),
                   Text(
                     'Loading...',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 16,
-                    ),
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
                   ),
                 ],
               ),
@@ -200,14 +258,10 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
-        // If user is logged in
         if (snapshot.hasData && snapshot.data != null) {
-          print('✅ User is logged in: ${snapshot.data!.uid}');
           return UserTypeRouter(user: snapshot.data!);
         }
 
-        // If no user is logged in, show onboarding
-        print('❌ No user logged in, showing onboarding');
         return const OnboardingScreen();
       },
     );
@@ -223,28 +277,19 @@ class UserTypeRouter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<DocumentSnapshot>(
-      future: FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get(),
+      future: FirebaseFirestore.instance.collection('users').doc(user.uid).get(),
       builder: (context, snapshot) {
-        // Show loading while fetching user data
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(
             body: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(
-                    color: Colors.green.shade600,
-                  ),
+                  CircularProgressIndicator(color: Colors.green.shade600),
                   const SizedBox(height: 16),
                   Text(
                     'Loading your profile...',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 16,
-                    ),
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
                   ),
                 ],
               ),
@@ -252,35 +297,23 @@ class UserTypeRouter extends StatelessWidget {
           );
         }
 
-        // If error occurred or no data
         if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
-          print('❌ Error fetching user data or document does not exist');
-          // Sign out user and return to login
           firebase_auth.FirebaseAuth.instance.signOut();
           return const LoginScreen();
         }
 
-        // Get user type from Firestore
         final userData = snapshot.data!.data() as Map<String, dynamic>?;
         final userType = userData?['userType'] ?? 'customer';
         final isActive = userData?['isActive'] ?? true;
 
-        print('✅ User type: $userType');
-        print('✅ Active status: $isActive');
-
-        // Check if user is active
         if (!isActive) {
-          print('❌ User is not active');
           firebase_auth.FirebaseAuth.instance.signOut();
           return const LoginScreen();
         }
 
-        // Navigate based on user type
         if (userType == 'stationOwner') {
-          print('🚗 Routing to Station Dashboard');
           return const StationDashboardScreen();
         } else {
-          print('🏠 Routing to Home Screen');
           return const HomeScreen();
         }
       },
